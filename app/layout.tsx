@@ -5,7 +5,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "不動産DXモック",
-  description: "Panasonic Homes / P社向け 用地取得査定ダッシュボード"
+  description: "Panasonic Homes / P社向け 用地取得査定ダッシュボード",
+  icons: {
+    icon: "/logo.svg"
+  }
 };
 
 export default function RootLayout({

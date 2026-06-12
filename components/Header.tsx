@@ -1,11 +1,11 @@
-import { Building2, Landmark, ShieldCheck, Server } from "lucide-react";
+import { Building2, ShieldCheck, Server } from "lucide-react";
 
 export default function Header() {
   return (
     <header className="app-header">
       <div className="header-brand">
-        <div aria-hidden="true" className="brand-mark">
-          <Landmark size={26} />
+        <div className="brand-mark">
+          <img alt="" aria-hidden="true" className="brand-logo" src="/logo.svg" />
         </div>
         <div className="header-title-group">
           <p className="eyebrow">LAND ACQUISITION WORKBENCH</p>
