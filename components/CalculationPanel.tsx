@@ -39,14 +39,16 @@ export default function CalculationPanel({ result, growthRatePercent, adjustment
     {
       label: "入札額",
       value: formatYen(result.bidAmount),
-      sub: "調整後"
+      sub: "調整後",
+      tone: "highlight"
     }
   ];
 
   return (
     <section className="panel calculation-panel">
       <div className="section-heading">
-        <span>計算部分</span>
+        <span>入札シミュレーション</span>
+        <small>選択 {result.selectedCount}件</small>
       </div>
 
       <div className="calc-summary">
@@ -59,7 +61,7 @@ export default function CalculationPanel({ result, growthRatePercent, adjustment
 
       <div className="kpi-grid">
         {cards.map((card) => (
-          <div className="kpi-card" key={card.label}>
+          <div className={`kpi-card ${card.tone ?? ""}`} key={card.label}>
             <span>{card.label}</span>
             <strong>{card.value}</strong>
             <small>{card.sub}</small>
@@ -77,4 +79,3 @@ export default function CalculationPanel({ result, growthRatePercent, adjustment
     </section>
   );
 }
-

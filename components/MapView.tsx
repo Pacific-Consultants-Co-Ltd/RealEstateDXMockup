@@ -68,7 +68,7 @@ export default function MapView({ cases, landPricePoints, target, radius, select
     <section className="panel map-panel">
       <div className="map-title-row">
         <div className="section-heading">
-          <span>表示するエリアの選択</span>
+          <span>周辺取引・地価マップ</span>
           <small>{selectedAreas.join(" / ")}</small>
         </div>
         <div className="map-legend">
@@ -80,6 +80,9 @@ export default function MapView({ cases, landPricePoints, target, radius, select
           </span>
           <span>
             <i className="legend-land" /> 公示地価
+          </span>
+          <span>
+            <i className="legend-target" /> 対象地
           </span>
         </div>
       </div>

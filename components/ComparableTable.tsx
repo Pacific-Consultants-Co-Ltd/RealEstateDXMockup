@@ -25,12 +25,12 @@ const sourceOptions: Array<{ value: "all" | ComparableCaseSource; label: string 
 ];
 
 const sortableHeaders: Array<{ key: CaseSortKey; label: string }> = [
-  { key: "source", label: "source" },
-  { key: "address", label: "address" },
-  { key: "landAreaTsubo", label: "landAreaTsubo" },
-  { key: "priceTotalYen", label: "priceTotalYen" },
-  { key: "unitPricePerTsubo", label: "unitPricePerTsubo" },
-  { key: "transactionDate", label: "transactionDate" }
+  { key: "source", label: "ソース" },
+  { key: "address", label: "所在地" },
+  { key: "landAreaTsubo", label: "土地面積" },
+  { key: "priceTotalYen", label: "価格" },
+  { key: "unitPricePerTsubo", label: "坪単価" },
+  { key: "transactionDate", label: "成約年月日" }
 ];
 
 function parseWalkMinutes(access?: string): number | undefined {
@@ -151,8 +151,8 @@ export default function ComparableTable({
     <section className="panel table-panel">
       <div className="table-title-row">
         <div className="section-heading">
-          <span>市場情報</span>
-          <small>選択された事例の表示</small>
+          <span>比較事例台帳</span>
+          <small>選択候補と成約条件</small>
         </div>
         <div className="table-count">
           {filteredCases.length} / {cases.length} 件
@@ -219,7 +219,7 @@ export default function ComparableTable({
             <tr>
               <th>選択</th>
               <th>
-                <SortButton active={sort.key === "source"} label="source" onClick={() => toggleSort("source")} />
+                <SortButton active={sort.key === "source"} label="ソース" onClick={() => toggleSort("source")} />
               </th>
               <th>
                 <SortButton active={sort.key === "address"} label="所在地" onClick={() => toggleSort("address")} />
@@ -255,6 +255,13 @@ export default function ComparableTable({
             </tr>
           </thead>
           <tbody>
+            {filteredCases.length === 0 ? (
+              <tr>
+                <td className="table-empty" colSpan={15}>
+                  条件に一致する市場情報はありません。
+                </td>
+              </tr>
+            ) : null}
             {filteredCases.map((comparable) => (
               <tr className={comparable.selected ? "selected-row" : ""} key={comparable.id}>
                 <td>

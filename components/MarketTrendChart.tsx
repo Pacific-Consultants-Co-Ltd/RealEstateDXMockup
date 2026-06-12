@@ -32,12 +32,13 @@ export default function MarketTrendChart({ points }: MarketTrendChartProps) {
   return (
     <section className="panel chart-panel">
       <div className="section-heading">
-        <span>市場見通し</span>
+        <span>公示地価トレンド</span>
+        <small>価格 / 変動率</small>
       </div>
       <div className="chart-wrap">
         <ResponsiveContainer height={220} width="100%">
           <ComposedChart data={chartData} margin={{ top: 10, right: 4, bottom: 4, left: 4 }}>
-            <CartesianGrid stroke="#e4e9f0" strokeDasharray="3 3" />
+            <CartesianGrid stroke="#e1e7e4" strokeDasharray="3 3" />
             <XAxis dataKey="year" fontSize={12} tickLine={false} />
             <YAxis fontSize={12} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} yAxisId="price" />
             <YAxis
@@ -57,12 +58,12 @@ export default function MarketTrendChart({ points }: MarketTrendChartProps) {
               }}
               labelFormatter={(label) => `${label}年`}
             />
-            <Bar dataKey="price" fill="#2f6f9f" name="価格（円/㎡）" radius={[4, 4, 0, 0]} yAxisId="price" />
+            <Bar dataKey="price" fill="#376d67" name="価格（円/㎡）" radius={[4, 4, 0, 0]} yAxisId="price" />
             <Line
               dataKey="growth"
               dot={{ r: 3 }}
               name="対前年変動率（%）"
-              stroke="#c9782d"
+              stroke="#d26a2e"
               strokeWidth={2}
               type="monotone"
               yAxisId="growth"

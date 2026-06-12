@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Activity, BadgeJapaneseYen, CheckCircle2, DatabaseZap, FileSpreadsheet, Ruler } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import CalculationPanel from "@/components/CalculationPanel";
@@ -11,6 +12,7 @@ import Header from "@/components/Header";
 import LoadingState from "@/components/LoadingState";
 import MarketTrendChart from "@/components/MarketTrendChart";
 import SearchInputPanel from "@/components/SearchInputPanel";
+import { formatPercent, formatYen, formatYenPerTsubo } from "@/lib/formatters";
 import { targetLocation } from "@/lib/mockData";
 import { deriveOsakaCoordinates } from "@/lib/normalizers";
 import { averageGrowthRate, calculateValuation } from "@/lib/valuation";
@@ -216,26 +218,60 @@ export default function DashboardPage() {
       <Header />
       <ErrorFallbackBanner messages={warnings} />
 
-      <div className="summary-strip">
-        <div>
-          <span>対象地</span>
+      <div className="deal-brief">
+        <div className="deal-primary">
+          <span className="deal-kicker">現在の査定対象</span>
           <strong>{address}</strong>
+          <small>
+            {selectedAreas.join(" / ")} ・ 半径 {radius}
+          </small>
         </div>
-        <div>
-          <span>CSV</span>
-          <strong>{cases.filter((comparable) => comparable.source === "csv").length}件</strong>
+        <div className="deal-value">
+          <span>概算入札額</span>
+          <strong>{formatYen(valuation.bidAmount)}</strong>
+          <small>査定額 {formatYen(valuation.appraisalAmount)}</small>
         </div>
-        <div>
-          <span>API取引</span>
-          <strong>{cases.filter((comparable) => comparable.source === "mlit_transaction").length}件</strong>
+        <div className="metric-card metric-accent">
+          <BadgeJapaneseYen aria-hidden="true" size={18} />
+          <div>
+            <span>坪単価相場</span>
+            <strong>{formatYenPerTsubo(valuation.averageTsuboUnitPrice)}</strong>
+          </div>
         </div>
-        <div>
-          <span>選択</span>
-          <strong>{selectedCases.length}件</strong>
+        <div className="metric-card">
+          <FileSpreadsheet aria-hidden="true" size={18} />
+          <div>
+            <span>CSV</span>
+            <strong>{cases.filter((comparable) => comparable.source === "csv").length}件</strong>
+          </div>
         </div>
-        <div>
-          <span>再計算</span>
-          <strong>{lastCalculatedAt}</strong>
+        <div className="metric-card">
+          <DatabaseZap aria-hidden="true" size={18} />
+          <div>
+            <span>API取引</span>
+            <strong>{cases.filter((comparable) => comparable.source === "mlit_transaction").length}件</strong>
+          </div>
+        </div>
+        <div className="metric-card">
+          <CheckCircle2 aria-hidden="true" size={18} />
+          <div>
+            <span>選択</span>
+            <strong>{selectedCases.length}件</strong>
+          </div>
+        </div>
+        <div className="metric-card">
+          <Ruler aria-hidden="true" size={18} />
+          <div>
+            <span>用地坪数</span>
+            <strong>{landTsubo}坪</strong>
+          </div>
+        </div>
+        <div className="metric-card">
+          <Activity aria-hidden="true" size={18} />
+          <div>
+            <span>上昇率</span>
+            <strong>{formatPercent(growthRatePercent)}</strong>
+          </div>
         </div>
       </div>
 
@@ -278,7 +314,10 @@ export default function DashboardPage() {
           )}
 
           <div className="selected-case-strip">
-            <span>選択中</span>
+            <span>
+              <CheckCircle2 aria-hidden="true" size={16} />
+              選択中
+            </span>
             <div>
               {selectedCases.length === 0 ? (
                 <strong>未選択</strong>
@@ -299,6 +338,7 @@ export default function DashboardPage() {
           <section className="panel production-note">
             <div className="section-heading">
               <span>運用前提</span>
+              <small>最終再計算 {lastCalculatedAt}</small>
             </div>
             <p>99.9% availability target / RTO within 30 minutes / 24-365 monitoring in production.</p>
             <p>Temporary domain under まちしるべ domain assumed.</p>

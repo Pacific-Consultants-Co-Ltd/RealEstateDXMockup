@@ -1,6 +1,6 @@
 "use client";
 
-import { Calculator, Database, FileUp, Search } from "lucide-react";
+import { Calculator, Database, FileUp, Radar, Search, Target } from "lucide-react";
 
 import type { InformationType, SourceToggles } from "@/lib/types";
 
@@ -58,86 +58,115 @@ export default function SearchInputPanel({
   return (
     <aside className="panel sidebar-panel">
       <div className="section-heading">
-        <span>入力部分</span>
+        <span>査定条件</span>
+        <small>ワークフロー</small>
       </div>
 
-      <label className="field">
-        <span>情報種別</span>
-        <select value={informationType} onChange={(event) => onInformationTypeChange(event.target.value as InformationType)}>
-          {informationTypes.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="field">
-        <span>所在地</span>
-        <input value={address} onChange={(event) => onAddressChange(event.target.value)} />
-      </label>
-
-      <div className="field">
-        <span>検索エリア</span>
-        <div className="chip-list">
-          {searchAreaOptions.map((area) => {
-            const active = selectedAreas.includes(area);
-            return (
+      <div className="form-section">
+        <div className="form-section-title">
+          <Target aria-hidden="true" size={15} />
+          <span>01 対象地</span>
+        </div>
+        <div className="field">
+          <span>情報種別</span>
+          <div aria-label="情報種別" className="segmented-control" role="group">
+            {informationTypes.map((type) => (
               <button
-                className={`chip ${active ? "active" : ""}`}
-                key={area}
+                className={informationType === type ? "active" : ""}
+                key={type}
                 type="button"
-                onClick={() => onToggleArea(area)}
+                onClick={() => onInformationTypeChange(type)}
               >
-                {area}
+                {type}
               </button>
-            );
-          })}
+            ))}
+          </div>
+        </div>
+
+        <label className="field">
+          <span>所在地</span>
+          <input value={address} onChange={(event) => onAddressChange(event.target.value)} />
+        </label>
+      </div>
+
+      <div className="form-section">
+        <div className="form-section-title">
+          <Radar aria-hidden="true" size={15} />
+          <span>02 周辺条件</span>
+        </div>
+        <div className="field">
+          <span>検索エリア</span>
+          <div className="chip-list">
+            {searchAreaOptions.map((area) => {
+              const active = selectedAreas.includes(area);
+              return (
+                <button
+                  className={`chip ${active ? "active" : ""}`}
+                  key={area}
+                  type="button"
+                  onClick={() => onToggleArea(area)}
+                >
+                  {area}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="field">
+          <span>検索半径</span>
+          <div aria-label="検索半径" className="segmented-control compact" role="group">
+            {radiusOptions.map((option) => (
+              <button
+                className={radius === option ? "active" : ""}
+                key={option}
+                type="button"
+                onClick={() => onRadiusChange(option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <label className="field">
-        <span>検索半径</span>
-        <select value={radius} onChange={(event) => onRadiusChange(event.target.value)}>
-          {radiusOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="form-section">
+        <div className="form-section-title">
+          <Calculator aria-hidden="true" size={15} />
+          <span>03 査定係数</span>
+        </div>
+        <div className="split-fields">
+          <label className="field">
+            <span>用地坪数</span>
+            <input
+              min={1}
+              type="number"
+              value={landTsubo}
+              onChange={(event) => onLandTsuboChange(Number(event.target.value))}
+            />
+          </label>
 
-      <div className="split-fields">
-        <label className="field">
-          <span>用地坪数</span>
-          <input
-            min={1}
-            type="number"
-            value={landTsubo}
-            onChange={(event) => onLandTsuboChange(Number(event.target.value))}
-          />
-        </label>
+          <label className="field">
+            <span>格差修正 / 買い上がり等調整</span>
+            <input
+              step={0.5}
+              type="number"
+              value={adjustmentPercent}
+              onChange={(event) => onAdjustmentPercentChange(Number(event.target.value))}
+            />
+          </label>
+        </div>
 
-        <label className="field">
-          <span>格差修正 / 買い上がり等調整</span>
-          <input
-            step={0.5}
-            type="number"
-            value={adjustmentPercent}
-            onChange={(event) => onAdjustmentPercentChange(Number(event.target.value))}
-          />
-        </label>
-      </div>
-
-      <div className="field">
-        <span>データソース</span>
-        <div className="toggle-list">
-          {sourceLabels.map((source) => (
-            <label className="toggle-row" key={source.key}>
-              <input checked={sourceToggles[source.key]} type="checkbox" onChange={() => onSourceToggle(source.key)} />
-              <span>{source.label}</span>
-            </label>
-          ))}
+        <div className="field">
+          <span>データソース</span>
+          <div className="toggle-list">
+            {sourceLabels.map((source) => (
+              <label className={`toggle-row ${sourceToggles[source.key] ? "active" : ""}`} key={source.key}>
+                <input checked={sourceToggles[source.key]} type="checkbox" onChange={() => onSourceToggle(source.key)} />
+                <span>{source.label}</span>
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 

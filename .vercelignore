@@ -1,10 +1,8 @@
-node_modules/
-.next/
-.vercel/
-out/
-dist/
 .env
 .env*.local
+.vercel/
+.next/
+node_modules/
 *.log
 dev-server.*.log
 tsconfig.tsbuildinfo
