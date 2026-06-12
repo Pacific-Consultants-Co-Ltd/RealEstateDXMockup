@@ -82,6 +82,10 @@ function hashText(text: string): number {
   return hash;
 }
 
+function stableIdHash(parts: unknown[]): string {
+  return hashText(parts.map(textValue).join("|")).toString(36);
+}
+
 export function deriveOsakaCoordinates(address: string, index = 0): { latitude: number; longitude: number } {
   const bases = [
     { test: /都島|野江|内代/, latitude: 34.7086, longitude: 135.5324 },
@@ -198,9 +202,21 @@ export function normalizeMlitTransactions(payload: unknown): ComparableCase[] {
       (price && area ? price / area : undefined);
     const unitTsubo = unitM2 ? unitM2 * M2_PER_TSUBO : price && landAreaTsubo ? price / landAreaTsubo : undefined;
     const coords = deriveOsakaCoordinates(fallbackAddress, index + 20);
+    const recordId = stableIdHash([
+      record.TradePrice,
+      record.PricePerUnit,
+      record.Area,
+      record.Type,
+      record.Region,
+      record.MunicipalityCode,
+      record.DistrictCode,
+      record.DistrictName,
+      record.Period,
+      index
+    ]);
 
     return {
-      id: `mlit-tx-${textValue(record.DistrictCode) || textValue(record.MunicipalityCode) || index}`,
+      id: `mlit-tx-${recordId}`,
       source: "mlit_transaction",
       propertyNumber: textValue(record.DistrictCode) || textValue(record.MunicipalityCode) || undefined,
       propertyType: textValue(record.Type) || textValue(record.Classification) || "取引事例",

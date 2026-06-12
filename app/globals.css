@@ -16,6 +16,7 @@
   --shadow: 0 10px 25px rgba(20, 32, 43, 0.08);
   --main-panel-height: 590px;
   --map-frame-height: 546px;
+  --main-stack-height: calc(var(--main-panel-height) + 64px);
   --market-table-height: clamp(320px, 44vh, 520px);
 }
 
@@ -173,6 +174,12 @@ button:disabled {
   display: grid;
   gap: 14px;
   min-width: 0;
+}
+
+.right-column {
+  max-height: var(--main-stack-height);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .panel {
@@ -940,6 +947,8 @@ tr.selected-row td {
   .right-column {
     grid-column: 1 / -1;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    max-height: none;
+    overflow: visible;
   }
 
   .production-note {
