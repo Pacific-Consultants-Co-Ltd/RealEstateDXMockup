@@ -8,9 +8,7 @@ export default function Header() {
           <img alt="" aria-hidden="true" className="brand-logo" src="/logo.svg" />
         </div>
         <div className="header-title-group">
-          <p className="eyebrow">LAND ACQUISITION WORKBENCH</p>
           <h1>不動産DXモック</h1>
-          <p className="header-subtitle">CSV・不動産情報ライブラリAPI・公示地価を統合した査定ワークスペース</p>
         </div>
       </div>
       <div aria-label="運用ステータス" className="header-meta">
