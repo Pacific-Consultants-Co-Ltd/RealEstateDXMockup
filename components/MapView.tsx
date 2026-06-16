@@ -1,27 +1,30 @@
 "use client";
 
-import L from "leaflet";
+import L, { type LeafletMouseEvent } from "leaflet";
 import { useMemo } from "react";
-import { Circle, MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
 
 import { formatM2, formatPercent, formatTsubo, formatYenPerM2, formatYenPerTsubo } from "@/lib/formatters";
 import type { ComparableCase, PublicLandPricePoint, TargetLocation } from "@/lib/types";
 
-interface MapViewProps {
-  cases: ComparableCase[];
-  landPricePoints: PublicLandPricePoint[];
-  target: TargetLocation;
-  radius: string;
-  selectedAreas: string[];
-  onToggleCase: (id: string) => void;
+export interface MapArea {
+  key: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+  count: number;
 }
 
-function radiusToMeters(radius: string): number {
-  if (radius.endsWith("km")) {
-    return Number.parseFloat(radius) * 1000;
-  }
-
-  return Number.parseFloat(radius) || 1000;
+interface MapViewProps {
+  areas: MapArea[];
+  cases: ComparableCase[];
+  landPricePoints: PublicLandPricePoint[];
+  selectedAreaKeys: string[];
+  selectedLandPointIds: string[];
+  target: TargetLocation;
+  onMapAreaClick: (latitude: number, longitude: number) => void;
+  onToggleCase: (id: string) => void;
+  onToggleLandPoint: (pointId: string) => void;
 }
 
 function comparableIcon(comparable: ComparableCase) {
@@ -33,10 +36,10 @@ function comparableIcon(comparable: ComparableCase) {
   });
 }
 
-function landPriceIcon() {
+function landPriceIcon(selected: boolean) {
   return L.divIcon({
     className: "marker-shell",
-    html: `<span class="land-price-marker"></span>`,
+    html: `<span class="land-price-marker ${selected ? "selected" : ""}"></span>`,
     iconAnchor: [10, 10],
     iconSize: [20, 20]
   });
@@ -51,7 +54,83 @@ function targetIcon() {
   });
 }
 
-export default function MapView({ cases, landPricePoints, target, radius, selectedAreas, onToggleCase }: MapViewProps) {
+function stopMapClick(event: LeafletMouseEvent) {
+  L.DomEvent.stopPropagation(event.originalEvent);
+}
+
+function MapClickHandler({ onMapAreaClick }: { onMapAreaClick: (latitude: number, longitude: number) => void }) {
+  useMapEvents({
+    click(event) {
+      onMapAreaClick(event.latlng.lat, event.latlng.lng);
+    }
+  });
+
+  return null;
+}
+
+function MapLegend() {
+  return (
+    <div className="map-legend-overlay">
+      <details
+        aria-label="地図凡例"
+        className="map-legend"
+        onClick={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
+        <summary>
+          <span className="legend-toggle-icon" aria-hidden="true" />
+          凡例
+        </summary>
+        <div className="map-legend-grid">
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-target" aria-hidden="true" />
+            対象地
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-case-csv" aria-hidden="true" />
+            CSV事例
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-case-mlit" aria-hidden="true" />
+            取引価格情報
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-case-selected" aria-hidden="true" />
+            選択事例
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-land" aria-hidden="true" />
+            公示地価
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-land-selected" aria-hidden="true" />
+            選択地価
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-radius" aria-hidden="true" />
+            1km圏
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-area" aria-hidden="true" />
+            選択町丁目
+          </span>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+export default function MapView({
+  areas,
+  cases,
+  landPricePoints,
+  selectedAreaKeys,
+  selectedLandPointIds,
+  target,
+  onMapAreaClick,
+  onToggleCase,
+  onToggleLandPoint
+}: MapViewProps) {
   const latestLandPoints = useMemo(() => {
     const byPoint = new Map<string, PublicLandPricePoint>();
     for (const point of landPricePoints) {
@@ -64,46 +143,35 @@ export default function MapView({ cases, landPricePoints, target, radius, select
     return Array.from(byPoint.values());
   }, [landPricePoints]);
 
-  return (
-    <section className="panel map-panel">
-      <div className="map-title-row">
-        <div className="section-heading">
-          <span>周辺取引・地価マップ</span>
-          <small>{selectedAreas.join(" / ")}</small>
-        </div>
-        <div className="map-legend">
-          <span>
-            <i className="legend-case" /> 事例
-          </span>
-          <span>
-            <i className="legend-selected" /> 選択
-          </span>
-          <span>
-            <i className="legend-land" /> 公示地価
-          </span>
-          <span>
-            <i className="legend-target" /> 対象地
-          </span>
-        </div>
-      </div>
+  const selectedAreas = areas.filter((area) => selectedAreaKeys.includes(area.key));
 
+  return (
+    <section className="map-panel">
       <div className="map-frame">
         <MapContainer center={[target.latitude, target.longitude]} scrollWheelZoom zoom={13}>
+          <MapClickHandler onMapAreaClick={onMapAreaClick} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <Circle
             center={[target.latitude, target.longitude]}
-            pathOptions={{ color: "#1f5f8b", fillColor: "#2f86c5", fillOpacity: 0.08, weight: 2 }}
-            radius={radiusToMeters(radius)}
+            pathOptions={{ color: "#375f96", fillColor: "#5b8fc7", fillOpacity: 0.06, weight: 1.5 }}
+            radius={1000}
           />
+          {selectedAreas.map((area) => (
+            <Circle
+              center={[area.latitude, area.longitude]}
+              key={area.key}
+              pathOptions={{ color: "#d71920", fillColor: "#d71920", fillOpacity: 0.12, weight: 2 }}
+              radius={460}
+            />
+          ))}
           <Marker icon={targetIcon()} position={[target.latitude, target.longitude]}>
             <Popup>
               <div className="map-popup">
                 <strong>対象地</strong>
                 <p>{target.address}</p>
-                <small>検索半径: {radius}</small>
               </div>
             </Popup>
           </Marker>
@@ -111,7 +179,10 @@ export default function MapView({ cases, landPricePoints, target, radius, select
           {cases.map((comparable) => (
             <Marker
               eventHandlers={{
-                click: () => onToggleCase(comparable.id)
+                click: (event) => {
+                  stopMapClick(event);
+                  onToggleCase(comparable.id);
+                }
               }}
               icon={comparableIcon(comparable)}
               key={comparable.id}
@@ -140,43 +211,58 @@ export default function MapView({ cases, landPricePoints, target, radius, select
                       <dd>{comparable.zoning || "-"}</dd>
                     </div>
                     <div>
-                      <dt>成約日</dt>
+                      <dt>取引時期</dt>
                       <dd>{comparable.transactionDate || "-"}</dd>
                     </div>
                   </dl>
                   <button className="popup-button" type="button" onClick={() => onToggleCase(comparable.id)}>
-                    {comparable.selected ? "選択解除" : "選択する"}
+                    {comparable.selected ? "選択解除" : "選択"}
                   </button>
                 </div>
               </Popup>
             </Marker>
           ))}
 
-          {latestLandPoints.map((point) => (
-            <Marker icon={landPriceIcon()} key={point.id} position={[point.latitude, point.longitude]}>
-              <Popup>
-                <div className="map-popup">
-                  <strong>{point.standardLotNumber || point.pointId}</strong>
-                  <p>{point.address}</p>
-                  <dl>
-                    <div>
-                      <dt>価格</dt>
-                      <dd>{formatYenPerM2(point.pricePerM2)}</dd>
-                    </div>
-                    <div>
-                      <dt>前年比</dt>
-                      <dd>{formatPercent(point.yearOnYearChangeRate)}</dd>
-                    </div>
-                    <div>
-                      <dt>最寄駅</dt>
-                      <dd>{point.nearestStation || "-"}</dd>
-                    </div>
-                  </dl>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+          {latestLandPoints.map((point) => {
+            const selected = selectedLandPointIds.includes(point.pointId);
+
+            return (
+              <Marker
+                eventHandlers={{
+                  click: (event) => {
+                    stopMapClick(event);
+                    onToggleLandPoint(point.pointId);
+                  }
+                }}
+                icon={landPriceIcon(selected)}
+                key={point.id}
+                position={[point.latitude, point.longitude]}
+              >
+                <Popup>
+                  <div className="map-popup">
+                    <strong>{point.standardLotNumber || point.pointId}</strong>
+                    <p>{point.address}</p>
+                    <dl>
+                      <div>
+                        <dt>価格</dt>
+                        <dd>{formatYenPerM2(point.pricePerM2)}</dd>
+                      </div>
+                      <div>
+                        <dt>前年比</dt>
+                        <dd>{formatPercent(point.yearOnYearChangeRate)}</dd>
+                      </div>
+                      <div>
+                        <dt>最寄駅</dt>
+                        <dd>{point.nearestStation || "-"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
+        <MapLegend />
       </div>
     </section>
   );

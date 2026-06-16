@@ -1,11 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 
 import ErrorFallbackBanner from "@/components/ErrorFallbackBanner";
 import LoadingState from "@/components/LoadingState";
+import type { MapArea } from "@/components/MapView";
 import {
   formatM2,
   formatPercent,
@@ -17,15 +19,12 @@ import {
 import { targetLocation } from "@/lib/mockData";
 import { deriveOsakaCoordinates } from "@/lib/normalizers";
 import { averageGrowthRate, calculateValuation } from "@/lib/valuation";
-import type { ComparableCase, InformationType, PublicLandPricePoint, TargetLocation } from "@/lib/types";
+import type { ComparableCase, InformationType, PublicLandPricePoint, TargetLocation, ValuationResult } from "@/lib/types";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
   loading: () => <LoadingState label="地図を初期化しています" />
 });
-
-const reportAreas = ["都島本通5丁目", "滝井元町3丁目", "豊崎6丁目"];
-const radius = "1km";
 
 interface CsvResponse {
   cases: ComparableCase[];
@@ -47,10 +46,16 @@ interface LandPriceResponse {
 
 interface HistoryRow {
   year: number;
-  point: string;
   price: number;
   growth: number;
 }
+
+const emptyValuation = calculateValuation({
+  selectedCases: [],
+  landTsubo: 100,
+  growthRatePercent: 0,
+  adjustmentPercent: 0
+});
 
 async function requestJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
@@ -88,8 +93,87 @@ function withDefaultSelection(items: ComparableCase[]): ComparableCase[] {
   return items.map((item) => (selectedIds.has(item.id) ? { ...item, selected: true } : item));
 }
 
+function normalizeAddress(address: string): string {
+  return address.replace(/\s+/g, "").replace(/^大阪府/, "");
+}
+
+function townKey(address: string): string {
+  const normalized = normalizeAddress(address);
+  const adminIndex = Math.max(normalized.lastIndexOf("区"), normalized.lastIndexOf("市"));
+  const tail = adminIndex >= 0 ? normalized.slice(adminIndex + 1) : normalized;
+  const chome = tail.match(/^(.+?[0-9０-９]+丁目)/);
+
+  return chome?.[1] || tail.slice(0, 10) || address;
+}
+
+function buildAreaOptions(cases: ComparableCase[]): MapArea[] {
+  const grouped = new Map<string, { latitude: number; longitude: number; count: number }>();
+
+  for (const item of cases) {
+    if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) {
+      continue;
+    }
+
+    const key = townKey(item.address);
+    const current = grouped.get(key);
+    if (current) {
+      current.latitude += item.latitude;
+      current.longitude += item.longitude;
+      current.count += 1;
+    } else {
+      grouped.set(key, { latitude: item.latitude, longitude: item.longitude, count: 1 });
+    }
+  }
+
+  return Array.from(grouped.entries())
+    .map(([key, value]) => ({
+      key,
+      label: key,
+      latitude: value.latitude / value.count,
+      longitude: value.longitude / value.count,
+      count: value.count
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label, "ja"));
+}
+
+function distanceMeters(left: { latitude: number; longitude: number }, right: { latitude: number; longitude: number }): number {
+  const earthRadius = 6_371_000;
+  const leftLat = (left.latitude * Math.PI) / 180;
+  const rightLat = (right.latitude * Math.PI) / 180;
+  const deltaLat = ((right.latitude - left.latitude) * Math.PI) / 180;
+  const deltaLng = ((right.longitude - left.longitude) * Math.PI) / 180;
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(leftLat) * Math.cos(rightLat) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+
+  return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findNearestArea(areas: MapArea[], latitude: number, longitude: number): MapArea | undefined {
+  return areas
+    .map((area) => ({
+      area,
+      distance: distanceMeters({ latitude, longitude }, { latitude: area.latitude, longitude: area.longitude })
+    }))
+    .filter((candidate) => candidate.distance <= 1600)
+    .sort((left, right) => left.distance - right.distance)[0]?.area;
+}
+
+function latestLandPoints(points: PublicLandPricePoint[]): PublicLandPricePoint[] {
+  const byPoint = new Map<string, PublicLandPricePoint>();
+
+  for (const point of points) {
+    const current = byPoint.get(point.pointId);
+    if (!current || current.year < point.year) {
+      byPoint.set(point.pointId, point);
+    }
+  }
+
+  return Array.from(byPoint.values()).sort((left, right) => left.pointId.localeCompare(right.pointId, "ja"));
+}
+
 function buildHistoryRows(points: PublicLandPricePoint[]): HistoryRow[] {
-  const byYear = new Map<number, HistoryRow>();
+  const byYear = new Map<number, { price: number; growth: number; count: number }>();
 
   for (const point of points) {
     if (!Number.isFinite(point.year) || !Number.isFinite(point.pricePerM2)) {
@@ -98,32 +182,25 @@ function buildHistoryRows(points: PublicLandPricePoint[]): HistoryRow[] {
 
     const existing = byYear.get(point.year);
     if (existing) {
-      existing.price = Math.round((existing.price + point.pricePerM2) / 2);
-      existing.growth = Number(((existing.growth + point.yearOnYearChangeRate) / 2).toFixed(1));
-      continue;
+      existing.price += point.pricePerM2;
+      existing.growth += point.yearOnYearChangeRate;
+      existing.count += 1;
+    } else {
+      byYear.set(point.year, {
+        price: point.pricePerM2,
+        growth: point.yearOnYearChangeRate,
+        count: 1
+      });
     }
-
-    byYear.set(point.year, {
-      year: point.year,
-      point: point.standardLotNumber || point.pointId,
-      price: point.pricePerM2,
-      growth: point.yearOnYearChangeRate
-    });
   }
 
-  return Array.from(byYear.values()).sort((a, b) => b.year - a.year);
-}
-
-function formatEraYear(year: number): string {
-  if (year >= 2019) {
-    return `令和${year - 2018}年`;
-  }
-
-  return `${year}年`;
-}
-
-function compactAddress(address: string): string {
-  return address.replace(/^大阪府/, "").replace(/^大阪市/, "");
+  return Array.from(byYear.entries())
+    .map(([year, value]) => ({
+      year,
+      price: Math.round(value.price / value.count),
+      growth: Number((value.growth / value.count).toFixed(1))
+    }))
+    .sort((left, right) => left.year - right.year);
 }
 
 function stationLabel(comparable: ComparableCase): string {
@@ -131,16 +208,12 @@ function stationLabel(comparable: ComparableCase): string {
   return station || comparable.nearestStation || "-";
 }
 
-function caseRows(cases: ComparableCase[], offset = 0): ComparableCase[] {
-  const sorted = [...cases].sort((left, right) => {
-    if (left.selected !== right.selected) {
-      return left.selected ? -1 : 1;
-    }
+function compactAddress(address: string): string {
+  return normalizeAddress(address).replace(/^大阪市/, "");
+}
 
-    return (right.unitPricePerTsubo ?? 0) - (left.unitPricePerTsubo ?? 0);
-  });
-
-  return sorted.slice(offset, offset + 8);
+function formatMultiplier(growthRatePercent: number): string {
+  return `${formatPercent(growthRatePercent)} / ${(1 + growthRatePercent / 100).toFixed(3)}倍`;
 }
 
 export default function DashboardPage() {
@@ -148,10 +221,15 @@ export default function DashboardPage() {
   const [address, setAddress] = useState(targetLocation.address);
   const [landTsubo, setLandTsubo] = useState(100);
   const [adjustmentPercent, setAdjustmentPercent] = useState(0);
+  const [showAllProperties, setShowAllProperties] = useState(true);
+  const [selectedAreaKeys, setSelectedAreaKeys] = useState<string[]>([]);
+  const [selectedLandPointIds, setSelectedLandPointIds] = useState<string[]>([]);
   const [cases, setCases] = useState<ComparableCase[]>([]);
   const [landPricePoints, setLandPricePoints] = useState<PublicLandPricePoint[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [valuation, setValuation] = useState<ValuationResult>(emptyValuation);
+  const [calculationDirty, setCalculationDirty] = useState(false);
 
   async function loadAllData() {
     setLoading(true);
@@ -163,9 +241,26 @@ export default function DashboardPage() {
         requestJson<LandPriceResponse>("/api/reinfolib/land-price-points")
       ]);
 
-      setCases(withDefaultSelection([...(csv.cases ?? []), ...(transactions.cases ?? [])]));
-      setLandPricePoints(landPrices.points ?? []);
+      const nextCases = withDefaultSelection([...(csv.cases ?? []), ...(transactions.cases ?? [])]);
+      const nextLandPricePoints = landPrices.points ?? [];
+      const initialLandPointIds = latestLandPoints(nextLandPricePoints)
+        .slice(0, 1)
+        .map((point) => point.pointId);
+      const initialGrowthRate = averageGrowthRate(nextLandPricePoints.filter((point) => initialLandPointIds.includes(point.pointId)));
+
+      setCases(nextCases);
+      setLandPricePoints(nextLandPricePoints);
+      setSelectedLandPointIds(initialLandPointIds);
+      setValuation(
+        calculateValuation({
+          selectedCases: nextCases.filter((item) => item.selected),
+          landTsubo: 100,
+          growthRatePercent: initialGrowthRate,
+          adjustmentPercent: 0
+        })
+      );
       setWarnings(mergeWarnings(csv.warnings, [transactions.warning], [landPrices.warning]));
+      setCalculationDirty(false);
     } catch (error) {
       setWarnings([error instanceof Error ? error.message : "初期データ取得に失敗しました。"]);
     } finally {
@@ -177,30 +272,81 @@ export default function DashboardPage() {
     void loadAllData();
   }, []);
 
+  function markDirty() {
+    setCalculationDirty(true);
+  }
+
   function handleToggleCase(id: string) {
     setCases((current) => current.map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
+    markDirty();
+  }
+
+  function handleToggleLandPoint(pointId: string) {
+    setSelectedLandPointIds((current) =>
+      current.includes(pointId) ? current.filter((id) => id !== pointId) : [...current, pointId]
+    );
+    markDirty();
+  }
+
+  function handleToggleAllProperties() {
+    setShowAllProperties((current) => !current);
+    setSelectedAreaKeys([]);
+    markDirty();
+  }
+
+  function handleMapAreaClick(latitude: number, longitude: number) {
+    const nearestArea = findNearestArea(areaOptions, latitude, longitude);
+    if (!nearestArea) {
+      return;
+    }
+
+    setShowAllProperties(false);
+    setSelectedAreaKeys((current) =>
+      current.includes(nearestArea.key) ? current.filter((key) => key !== nearestArea.key) : [...current, nearestArea.key]
+    );
+    markDirty();
+  }
+
+  function handleRecalculate() {
+    setValuation(
+      calculateValuation({
+        selectedCases: selectedVisibleCases,
+        landTsubo,
+        growthRatePercent,
+        adjustmentPercent
+      })
+    );
+    setCalculationDirty(false);
   }
 
   const target = useMemo(() => currentTarget(address), [address]);
-  const selectedCases = useMemo(() => cases.filter((item) => item.selected), [cases]);
-  const growthRatePercent = useMemo(() => averageGrowthRate(landPricePoints), [landPricePoints]);
-  const valuation = useMemo(
+  const areaOptions = useMemo(() => buildAreaOptions(cases), [cases]);
+  const visibleCases = useMemo(
+    () => (showAllProperties ? cases : cases.filter((item) => selectedAreaKeys.includes(townKey(item.address)))),
+    [cases, selectedAreaKeys, showAllProperties]
+  );
+  const selectedVisibleCases = useMemo(() => visibleCases.filter((item) => item.selected), [visibleCases]);
+  const selectedLandSeries = useMemo(
+    () => landPricePoints.filter((point) => selectedLandPointIds.includes(point.pointId)),
+    [landPricePoints, selectedLandPointIds]
+  );
+  const growthRatePercent = useMemo(() => averageGrowthRate(selectedLandSeries), [selectedLandSeries]);
+  const draftValuation = useMemo(
     () =>
       calculateValuation({
-        selectedCases,
+        selectedCases: selectedVisibleCases,
         landTsubo,
         growthRatePercent,
         adjustmentPercent
       }),
-    [adjustmentPercent, growthRatePercent, landTsubo, selectedCases]
+    [adjustmentPercent, growthRatePercent, landTsubo, selectedVisibleCases]
   );
-  const historyRows = useMemo(() => buildHistoryRows(landPricePoints), [landPricePoints]);
-  const primaryRows = useMemo(() => caseRows(cases), [cases]);
-  const secondaryRows = useMemo(() => caseRows(cases, 8), [cases]);
+  const historyRows = useMemo(() => buildHistoryRows(selectedLandSeries), [selectedLandSeries]);
+  const latestPoints = useMemo(() => latestLandPoints(landPricePoints), [landPricePoints]);
 
   return (
     <main className="report-app">
-      <section className="report-sheet" aria-label="不動産査定レポート">
+      <section className="report-sheet" aria-label="用地取得査定">
         <header className="report-header-grid">
           <div className="report-info-table" aria-label="査定条件">
             <label className="report-info-row">
@@ -220,8 +366,12 @@ export default function DashboardPage() {
               <span>敷地面積</span>
               <input
                 inputMode="decimal"
+                type="number"
                 value={landTsubo}
-                onChange={(event) => setLandTsubo(Number(event.target.value) || 0)}
+                onChange={(event) => {
+                  setLandTsubo(Number(event.target.value) || 0);
+                  markDirty();
+                }}
               />
             </label>
           </div>
@@ -229,19 +379,34 @@ export default function DashboardPage() {
           <div className="brand-panel">
             <div className="brand-bar">Panasonic Homes</div>
             <div className="valuation-strip" aria-label="査定結果">
-              <MetricBox label="グロス相場" value={formatYen(valuation.grossMarketPrice)} />
-              <MetricBox label="単価相場" value={formatYenPerTsubo(valuation.averageTsuboUnitPrice)} />
+              <MetricBox label="単価相場" value={formatYenPerTsubo(draftValuation.averageTsuboUnitPrice)} />
               <MetricBox label="上昇率" value={formatPercent(growthRatePercent)} />
+              <MetricBox label="査定金額" value={formatYen(valuation.appraisalAmount)} />
               <label className="metric-box editable">
-                <span>要因調整</span>
+                <span>補正係数</span>
                 <input
                   inputMode="decimal"
+                  type="number"
                   value={adjustmentPercent}
-                  onChange={(event) => setAdjustmentPercent(Number(event.target.value) || 0)}
+                  onChange={(event) => {
+                    setAdjustmentPercent(Number(event.target.value) || 0);
+                    markDirty();
+                  }}
                 />
               </label>
-              <MetricBox label="査定金額" value={formatYen(valuation.appraisalAmount)} />
               <MetricBox label="入札額" value={formatYen(valuation.bidAmount)} strong />
+              <button className="report-recalculate-button" type="button" onClick={handleRecalculate}>
+                <RefreshCw aria-hidden="true" size={14} />
+                再計算
+              </button>
+            </div>
+            <div className="report-status-row">
+              <button className="report-toggle-button" type="button" onClick={handleToggleAllProperties}>
+                {showAllProperties ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
+                {showAllProperties ? "全物件非表示" : "全物件表示"}
+              </button>
+              <span>{showAllProperties ? "全物件表示" : selectedAreaKeys.length > 0 ? selectedAreaKeys.join(" / ") : "物件非表示"}</span>
+              {calculationDirty ? <strong className="dirty-label">未再計算</strong> : <strong className="clean-label">反映済み</strong>}
             </div>
           </div>
         </header>
@@ -250,36 +415,77 @@ export default function DashboardPage() {
 
         <section className="evidence-grid" aria-label="周辺資料">
           <div className="report-map">
-            {loading && cases.length === 0 ? (
-              <LoadingState label="市場データを読み込んでいます" />
-            ) : (
-              <MapView
-                cases={cases}
-                landPricePoints={landPricePoints}
-                radius={radius}
-                selectedAreas={reportAreas}
-                target={target}
-                onToggleCase={handleToggleCase}
-              />
-            )}
+              {loading && cases.length === 0 ? (
+                <LoadingState label="市場データを読み込んでいます" />
+              ) : (
+                <MapView
+                  areas={areaOptions}
+                  cases={visibleCases}
+                  landPricePoints={landPricePoints}
+                  selectedAreaKeys={selectedAreaKeys}
+                  selectedLandPointIds={selectedLandPointIds}
+                  target={target}
+                  onMapAreaClick={handleMapAreaClick}
+                  onToggleCase={handleToggleCase}
+                  onToggleLandPoint={handleToggleLandPoint}
+                />
+              )}
           </div>
 
-          <ReportTrendChart rows={historyRows} />
-          <HistoryTable rows={historyRows} />
+          <section className="report-chart" aria-label="公示地価推移">
+            <div className="small-section-title">選択地点の地価推移</div>
+              {historyRows.length === 0 ? (
+                <LoadingState label="地価地点を選択" />
+              ) : (
+                <ResponsiveContainer height="100%" width="100%">
+                  <BarChart data={historyRows} margin={{ top: 14, right: 12, bottom: 12, left: 6 }}>
+                    <CartesianGrid stroke="#e6e8ec" vertical={false} />
+                    <XAxis dataKey="year" fontSize={11} tickLine={false} />
+                    <YAxis fontSize={11} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} width={42} />
+                    <Tooltip
+                      formatter={(value, name) => {
+                        if (name === "価格") {
+                          return [formatYenPerM2(Number(value)), name];
+                        }
+
+                        return [formatPercent(Number(value)), name];
+                      }}
+                      labelFormatter={(label) => `${label}年`}
+                    />
+                    <Bar dataKey="price" fill="#d71920" maxBarSize={28} name="価格" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+          </section>
+
+          <aside className="history-panel">
+            <div className="history-title">地価地点・過去推移</div>
+            <LandPointTable points={latestPoints} selectedPointIds={selectedLandPointIds} onToggle={handleToggleLandPoint} />
+            <HistoryTable rows={historyRows} />
+          </aside>
         </section>
 
-        <section className="report-table-stack" aria-label="取引事例一覧">
-          <ReportCaseTable
-            cases={primaryRows}
-            title={`周辺取引事例一覧（選択 ${selectedCases.length}件 / 表示 ${cases.length}件）`}
-            onToggleCase={handleToggleCase}
-          />
-          <ReportCaseTable
-            cases={secondaryRows.length > 0 ? secondaryRows : primaryRows}
-            title="近隣成約・補完事例一覧"
-            onToggleCase={handleToggleCase}
-          />
-        </section>
+        <CalculationFlow
+          adjustmentPercent={adjustmentPercent}
+          dirty={calculationDirty}
+          draftValuation={draftValuation}
+          growthRatePercent={growthRatePercent}
+          landTsubo={landTsubo}
+          selectedCaseCount={selectedVisibleCases.length}
+          selectedLandPointCount={selectedLandPointIds.length}
+          valuation={valuation}
+          onAdjustmentPercentChange={(value) => {
+            setAdjustmentPercent(value);
+            markDirty();
+          }}
+          onLandTsuboChange={(value) => {
+            setLandTsubo(value);
+            markDirty();
+          }}
+          onRecalculate={handleRecalculate}
+        />
+
+        <PropertyTable cases={visibleCases} selectedCount={selectedVisibleCases.length} onToggleCase={handleToggleCase} />
       </section>
     </main>
   );
@@ -294,129 +500,242 @@ function MetricBox({ label, value, strong = false }: { label: string; value: str
   );
 }
 
-function ReportTrendChart({ rows }: { rows: HistoryRow[] }) {
-  const chartRows = [...rows].reverse();
-
+function CalculationFlow({
+  adjustmentPercent,
+  dirty,
+  draftValuation,
+  growthRatePercent,
+  landTsubo,
+  selectedCaseCount,
+  selectedLandPointCount,
+  valuation,
+  onAdjustmentPercentChange,
+  onLandTsuboChange,
+  onRecalculate
+}: {
+  adjustmentPercent: number;
+  dirty: boolean;
+  draftValuation: ValuationResult;
+  growthRatePercent: number;
+  landTsubo: number;
+  selectedCaseCount: number;
+  selectedLandPointCount: number;
+  valuation: ValuationResult;
+  onAdjustmentPercentChange: (value: number) => void;
+  onLandTsuboChange: (value: number) => void;
+  onRecalculate: () => void;
+}) {
   return (
-    <section className="report-chart" aria-label="公示地価推移">
-      <div className="small-section-title">公示地価推移</div>
-      {chartRows.length === 0 ? (
-        <LoadingState label="地価データなし" />
-      ) : (
-        <ResponsiveContainer height="100%" width="100%">
-          <BarChart data={chartRows} margin={{ top: 18, right: 10, bottom: 18, left: 4 }}>
-            <CartesianGrid stroke="#e5e5e5" vertical={false} />
-            <XAxis dataKey="year" fontSize={10} interval={0} tickLine={false} />
-            <YAxis fontSize={10} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} width={38} />
-            <Tooltip
-              formatter={(value) => [formatYenPerM2(Number(value)), "価格"]}
-              labelFormatter={(label) => `${label}年`}
-            />
-            <Bar dataKey="price" fill="#ff1616" maxBarSize={16} name="価格" />
-          </BarChart>
-        </ResponsiveContainer>
-      )}
+    <section className="calculation-panel">
+      <div className="panel-heading compact">
+        <div>
+          <h2>計算式</h2>
+          <p>
+            物件 {selectedCaseCount}件 / 地価 {selectedLandPointCount}地点
+          </p>
+        </div>
+        {dirty ? <strong className="dirty-label">未再計算</strong> : <strong className="clean-label">反映済み</strong>}
+      </div>
+
+      <div className="formula-row">
+        <label className="formula-cell input-cell">
+          <span>用地坪数</span>
+          <input
+            inputMode="decimal"
+            min="0"
+            type="number"
+            value={landTsubo}
+            onChange={(event) => onLandTsuboChange(Number(event.target.value) || 0)}
+          />
+        </label>
+        <Operator value="×" />
+        <FormulaValue label="坪単価相場" value={formatYenPerTsubo(draftValuation.averageTsuboUnitPrice)} />
+        <Operator value="×" />
+        <FormulaValue label="地価上昇率" value={formatMultiplier(growthRatePercent)} />
+        <Operator value="=" />
+        <FormulaValue label="査定額" value={formatYen(valuation.appraisalAmount)} strong />
+        <Operator value="→" />
+        <label className="formula-cell input-cell suffix-cell">
+          <span>補正係数</span>
+          <input
+            inputMode="decimal"
+            type="number"
+            value={adjustmentPercent}
+            onChange={(event) => onAdjustmentPercentChange(Number(event.target.value) || 0)}
+          />
+          <small>%</small>
+        </label>
+        <Operator value="=" />
+        <FormulaValue label="入札額" value={formatYen(valuation.bidAmount)} accent />
+        <button className="recalculate-button" type="button" onClick={onRecalculate}>
+          <RefreshCw aria-hidden="true" size={16} />
+          再計算
+        </button>
+      </div>
     </section>
   );
 }
 
+function FormulaValue({ label, value, accent = false, strong = false }: { label: string; value: string; accent?: boolean; strong?: boolean }) {
+  return (
+    <div className={`formula-cell ${accent ? "accent" : ""} ${strong ? "strong" : ""}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function Operator({ value }: { value: string }) {
+  return <div className="formula-operator">{value}</div>;
+}
+
 function HistoryTable({ rows }: { rows: HistoryRow[] }) {
   return (
-    <section className="history-panel" aria-label="過去の地価、対前年変動一覧">
-      <div className="history-title">過去の地価、対前年変動一覧</div>
+    <div className="history-table-wrap">
       <table className="history-table">
         <thead>
           <tr>
             <th>年</th>
-            <th>標準地番号</th>
             <th>価格(円/㎡)</th>
-            <th>対前年変動率(%)</th>
+            <th>変動率</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={4}>地価データなし</td>
+              <td colSpan={3}>地価推移なし</td>
             </tr>
           ) : null}
-          {rows.slice(0, 7).map((row) => (
+          {rows.map((row) => (
             <tr key={row.year}>
-              <td>{formatEraYear(row.year)}</td>
-              <td>{row.point}</td>
+              <td>{row.year}年</td>
               <td>{Math.round(row.price).toLocaleString("ja-JP")}</td>
-              <td>{row.growth.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}</td>
+              <td>{row.growth.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}%</td>
             </tr>
           ))}
         </tbody>
       </table>
-    </section>
+    </div>
   );
 }
 
-function ReportCaseTable({
-  cases,
-  title,
-  onToggleCase
+function LandPointTable({
+  points,
+  selectedPointIds,
+  onToggle
 }: {
-  cases: ComparableCase[];
-  title: string;
-  onToggleCase: (id: string) => void;
+  points: PublicLandPricePoint[];
+  selectedPointIds: string[];
+  onToggle: (pointId: string) => void;
 }) {
   return (
-    <section className="report-case-section">
-      <div className="report-table-title">{title}</div>
-      <table className="case-table">
+    <div className="land-table-wrap">
+      <table className="land-table">
         <thead>
           <tr>
-            <th>最寄駅</th>
-            <th>取引総額</th>
-            <th>土地</th>
-            <th>単価</th>
-            <th>地形</th>
-            <th>前面道路</th>
-            <th>用途</th>
-            <th>建蔽率</th>
-            <th>容積率</th>
-            <th>取引時期</th>
-            <th>選</th>
+            <th>選択</th>
+            <th>地点</th>
+            <th>価格</th>
+            <th>変動率</th>
           </tr>
         </thead>
         <tbody>
-          {cases.length === 0 ? (
+          {points.length === 0 ? (
             <tr>
-              <td colSpan={11}>表示できる事例がありません。</td>
+              <td colSpan={4}>地価地点なし</td>
             </tr>
           ) : null}
-          {cases.map((comparable) => (
-            <tr key={comparable.id}>
-              <td>
-                <strong>{stationLabel(comparable)}</strong>
-                <span>{comparable.access || "-"}</span>
-              </td>
-              <td>{comparable.priceTotalDisplay || formatYen(comparable.priceTotalYen)}</td>
-              <td>
-                {formatTsubo(comparable.landAreaTsubo)}
-                <span>{formatM2(comparable.landAreaM2)}</span>
-              </td>
-              <td>{formatYenPerTsubo(comparable.unitPricePerTsubo)}</td>
-              <td>{comparable.propertyType || "長方形"}</td>
-              <td>{comparable.roadCondition || "-"}</td>
-              <td>{comparable.zoning || compactAddress(comparable.address)}</td>
-              <td>{comparable.buildingCoverageRatio ? `${comparable.buildingCoverageRatio}%` : "-"}</td>
-              <td>{comparable.floorAreaRatio ? `${comparable.floorAreaRatio}%` : "-"}</td>
-              <td>{comparable.transactionDate || "-"}</td>
+          {points.map((point) => (
+            <tr className={selectedPointIds.includes(point.pointId) ? "active-row" : ""} key={point.id}>
               <td>
                 <input
-                  aria-label={`${comparable.address}を選択`}
-                  checked={comparable.selected}
+                  aria-label={`${point.standardLotNumber || point.pointId}を選択`}
+                  checked={selectedPointIds.includes(point.pointId)}
                   type="checkbox"
-                  onChange={() => onToggleCase(comparable.id)}
+                  onChange={() => onToggle(point.pointId)}
                 />
               </td>
+              <td>
+                <strong>{point.standardLotNumber || point.pointId}</strong>
+                <span>{point.nearestStation || "-"}</span>
+              </td>
+              <td>{formatYenPerM2(point.pricePerM2)}</td>
+              <td>{formatPercent(point.yearOnYearChangeRate)}</td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function PropertyTable({
+  cases,
+  selectedCount,
+  onToggleCase
+}: {
+  cases: ComparableCase[];
+  selectedCount: number;
+  onToggleCase: (id: string) => void;
+}) {
+  return (
+    <section className="property-panel">
+      <div className="panel-heading compact property-heading">
+        <h2>物件リスト</h2>
+        <p className="property-count">
+          表示 {cases.length}件 / 選択 {selectedCount}件
+        </p>
+      </div>
+      <div className="property-table-wrap">
+        <table className="property-table">
+          <thead>
+            <tr>
+              <th>選択</th>
+              <th>町丁目</th>
+              <th>所在地</th>
+              <th>最寄駅</th>
+              <th>土地</th>
+              <th>取引総額</th>
+              <th>坪単価</th>
+              <th>前面道路</th>
+              <th>取引時期</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cases.length === 0 ? (
+              <tr>
+                <td colSpan={9}>地図で町丁目を選択するか、全物件表示を有効にしてください。</td>
+              </tr>
+            ) : null}
+            {cases.map((comparable) => (
+              <tr className={comparable.selected ? "active-row" : ""} key={comparable.id}>
+                <td>
+                  <input
+                    aria-label={`${comparable.address}を選択`}
+                    checked={comparable.selected}
+                    type="checkbox"
+                    onChange={() => onToggleCase(comparable.id)}
+                  />
+                </td>
+                <td>{townKey(comparable.address)}</td>
+                <td>{compactAddress(comparable.address)}</td>
+                <td>
+                  <strong>{stationLabel(comparable)}</strong>
+                  <span>{comparable.access || "-"}</span>
+                </td>
+                <td>
+                  {formatTsubo(comparable.landAreaTsubo)}
+                  <span>{formatM2(comparable.landAreaM2)}</span>
+                </td>
+                <td>{comparable.priceTotalDisplay || formatYen(comparable.priceTotalYen)}</td>
+                <td>{formatYenPerTsubo(comparable.unitPricePerTsubo)}</td>
+                <td>{comparable.roadCondition || "-"}</td>
+                <td>{comparable.transactionDate || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
