@@ -169,7 +169,21 @@ function latestLandPoints(points: PublicLandPricePoint[]): PublicLandPricePoint[
     }
   }
 
-  return Array.from(byPoint.values()).sort((left, right) => left.pointId.localeCompare(right.pointId, "ja"));
+  return Array.from(byPoint.values()).sort((left, right) => {
+    const latestYear = right.year - left.year;
+    if (latestYear !== 0) {
+      return latestYear;
+    }
+
+    const distance =
+      distanceMeters(targetLocation, { latitude: left.latitude, longitude: left.longitude }) -
+      distanceMeters(targetLocation, { latitude: right.latitude, longitude: right.longitude });
+    if (Math.abs(distance) > 1) {
+      return distance;
+    }
+
+    return left.pointId.localeCompare(right.pointId, "ja");
+  });
 }
 
 function buildHistoryRows(points: PublicLandPricePoint[]): HistoryRow[] {
@@ -200,7 +214,9 @@ function buildHistoryRows(points: PublicLandPricePoint[]): HistoryRow[] {
       price: Math.round(value.price / value.count),
       growth: Number((value.growth / value.count).toFixed(1))
     }))
-    .sort((left, right) => left.year - right.year);
+    .sort((left, right) => right.year - left.year)
+    .slice(0, 5)
+    .reverse();
 }
 
 function stationLabel(comparable: ComparableCase): string {
@@ -438,10 +454,10 @@ export default function DashboardPage() {
                 <LoadingState label="地価地点を選択" />
               ) : (
                 <ResponsiveContainer height="100%" width="100%">
-                  <BarChart data={historyRows} margin={{ top: 14, right: 12, bottom: 12, left: 6 }}>
+                  <BarChart barCategoryGap="18%" data={historyRows} margin={{ top: 10, right: 4, bottom: 2, left: 0 }}>
                     <CartesianGrid stroke="#e6e8ec" vertical={false} />
-                    <XAxis dataKey="year" fontSize={11} tickLine={false} />
-                    <YAxis fontSize={11} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} width={42} />
+                    <XAxis dataKey="year" fontSize={10} interval={0} minTickGap={0} tickLine={false} tickMargin={6} />
+                    <YAxis fontSize={10} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} width={34} />
                     <Tooltip
                       formatter={(value, name) => {
                         if (name === "価格") {
@@ -452,7 +468,7 @@ export default function DashboardPage() {
                       }}
                       labelFormatter={(label) => `${label}年`}
                     />
-                    <Bar dataKey="price" fill="#d71920" maxBarSize={28} name="価格" />
+                    <Bar dataKey="price" fill="#d71920" maxBarSize={24} name="価格" />
                   </BarChart>
                 </ResponsiveContainer>
               )}

@@ -73,6 +73,31 @@ export function parsePercent(value: unknown): number | undefined {
   return parseNumber(value);
 }
 
+function parseJapaneseYear(value: unknown): number | undefined {
+  const text = textValue(value);
+  const plainYear = text.match(/(19|20)\d{2}/);
+  if (plainYear) {
+    return Number(plainYear[0]);
+  }
+
+  const eraMatch = text.match(/(令和|平成|昭和)\s*([0-9０-９元]+)\s*年?/);
+  if (!eraMatch) {
+    return parseNumber(text);
+  }
+
+  const era = eraMatch[1];
+  const eraYearText = eraMatch[2] === "元" ? "1" : eraMatch[2].replace(/[０-９]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) - 0xfee0)
+  );
+  const eraYear = Number(eraYearText);
+  if (!Number.isFinite(eraYear)) {
+    return undefined;
+  }
+
+  const baseYear = era === "令和" ? 2018 : era === "平成" ? 1988 : 1925;
+  return baseYear + eraYear;
+}
+
 function hashText(text: string): number {
   let hash = 0;
   for (let index = 0; index < text.length; index += 1) {
@@ -270,7 +295,7 @@ export function normalizeLandPricePoints(payload: unknown): PublicLandPricePoint
     const coords = featureCoordinates(feature, index + 40);
     const pointId = textValue(properties.point_id) || textValue(properties.id) || `land-${index}`;
     const year =
-      parseNumber(properties.target_year_name_ja) ??
+      parseJapaneseYear(properties.target_year_name_ja) ??
       parseNumber(properties.year) ??
       new Date().getFullYear();
 
