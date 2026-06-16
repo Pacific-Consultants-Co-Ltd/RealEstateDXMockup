@@ -13,18 +13,17 @@ export async function GET() {
 
     return NextResponse.json({
       cases,
-      warnings,
+      warnings: warnings.length > 0 ? ["自社データの一部を読み取れなかったため、読み取れた情報のみ表示しています。"] : [],
       fallback: false
     });
   } catch (error) {
     return NextResponse.json(
       {
         cases: [],
-        warnings: [error instanceof Error ? error.message : "CSV読み込みに失敗しました。"],
+        warnings: ["自社データを読み込めませんでした。"],
         fallback: true
       },
       { status: 500 }
     );
   }
 }
-

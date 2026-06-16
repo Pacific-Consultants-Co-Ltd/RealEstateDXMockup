@@ -74,10 +74,6 @@ export default function CaseDetailDrawer({ comparable, onClose }: CaseDetailDraw
           </div>
         </dl>
 
-        <div className="raw-block">
-          <h3>raw</h3>
-          <pre>{JSON.stringify(comparable.raw, null, 2)}</pre>
-        </div>
       </aside>
     </div>
   );

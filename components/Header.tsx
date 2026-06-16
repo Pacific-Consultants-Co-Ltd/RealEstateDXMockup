@@ -1,4 +1,4 @@
-import { Building2, ShieldCheck, Server } from "lucide-react";
+import { Building2, FileText, ShieldCheck } from "lucide-react";
 
 export default function Header() {
   return (
@@ -8,21 +8,21 @@ export default function Header() {
           <img alt="" aria-hidden="true" className="brand-logo" src="/logo.svg" />
         </div>
         <div className="header-title-group">
-          <h1>不動産DXモック</h1>
+          <h1>不動産査定支援</h1>
         </div>
       </div>
-      <div aria-label="運用ステータス" className="header-meta">
+      <div aria-label="資料ステータス" className="header-meta">
         <span>
           <Building2 aria-hidden="true" size={15} />
           Panasonic Homes
         </span>
         <span>
-          <Server aria-hidden="true" size={15} />
-          AWS想定
+          <FileText aria-hidden="true" size={15} />
+          社内確認用
         </span>
         <strong>
           <ShieldCheck aria-hidden="true" size={15} />
-          CONFIDENTIAL
+          社外秘
         </strong>
       </div>
     </header>

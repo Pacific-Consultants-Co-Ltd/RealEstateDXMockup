@@ -58,7 +58,7 @@ export async function fetchTransactions(params: QueryParams): Promise<ApiResult<
     if (cases.length === 0) {
       return {
         data: mockTransactionCases,
-        warning: "不動産情報ライブラリAPIの取引事例が0件だったため、モック取引データを表示しています。",
+        warning: "取引事例を確認できなかったため、保存済みの周辺事例を表示しています。",
         fallback: true
       };
     }
@@ -67,7 +67,7 @@ export async function fetchTransactions(params: QueryParams): Promise<ApiResult<
   } catch (error) {
     return {
       data: mockTransactionCases,
-      warning: `${error instanceof Error ? error.message : "API取得に失敗しました"} モック取引データを表示しています。`,
+      warning: "取引事例を取得できなかったため、保存済みの周辺事例を表示しています。",
       fallback: true
     };
   }
@@ -85,7 +85,7 @@ export async function fetchLandPricePoints(params: QueryParams): Promise<ApiResu
     if (points.length === 0) {
       return {
         data: mockLandPricePoints,
-        warning: "不動産情報ライブラリAPIの公示地価が0件だったため、モック公示地価データを表示しています。",
+        warning: "公示地価を確認できなかったため、保存済みの地価情報を表示しています。",
         fallback: true
       };
     }
@@ -94,7 +94,7 @@ export async function fetchLandPricePoints(params: QueryParams): Promise<ApiResu
   } catch (error) {
     return {
       data: mockLandPricePoints,
-      warning: `${error instanceof Error ? error.message : "API取得に失敗しました"} モック公示地価データを表示しています。`,
+      warning: "公示地価を取得できなかったため、保存済みの地価情報を表示しています。",
       fallback: true
     };
   }

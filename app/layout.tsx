@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "不動産DXモック",
+  title: "不動産査定支援",
   description: "Panasonic Homes / P社向け 用地取得査定ダッシュボード",
   icons: {
     icon: "/logo.svg"

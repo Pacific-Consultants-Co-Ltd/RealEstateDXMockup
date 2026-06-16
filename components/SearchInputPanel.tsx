@@ -1,15 +1,15 @@
 "use client";
 
-import { Calculator, Database, FileUp, Radar, Search, Target } from "lucide-react";
+import { Calculator, FileUp, Radar, Search, ShieldCheck, Target } from "lucide-react";
 
 import type { InformationType, SourceToggles } from "@/lib/types";
 
-const informationTypes: InformationType[] = ["取引事例", "成約事例", "公示地価", "自社CSV"];
+const informationTypes: InformationType[] = ["取引事例", "成約事例", "公示地価", "自社データ"];
 const searchAreaOptions = ["都島本通5丁目", "滝井元町3丁目", "豊崎6丁目", "八重中町1丁目"];
 const radiusOptions = ["500m", "1km", "2km", "5km"];
 const sourceLabels: Array<{ key: keyof SourceToggles; label: string }> = [
-  { key: "csv", label: "CSV" },
-  { key: "mlit_transaction", label: "不動産情報ライブラリ API" },
+  { key: "csv", label: "自社データ" },
+  { key: "mlit_transaction", label: "取引事例" },
   { key: "mlit_land_price", label: "公示地価" },
   { key: "manual", label: "自社事例" }
 ];
@@ -158,7 +158,7 @@ export default function SearchInputPanel({
         </div>
 
         <div className="field">
-          <span>データソース</span>
+          <span>参照情報</span>
           <div className="toggle-list">
             {sourceLabels.map((source) => (
               <label className={`toggle-row ${sourceToggles[source.key] ? "active" : ""}`} key={source.key}>
@@ -186,8 +186,8 @@ export default function SearchInputPanel({
       </div>
 
       <div className="ops-note">
-        <Database aria-hidden="true" size={16} />
-        <span>Login ID / password authentication planned. SSL/TLS required. AWS deployment assumed.</span>
+        <ShieldCheck aria-hidden="true" size={16} />
+        <span>社内確認用の査定情報です。</span>
       </div>
     </aside>
   );

@@ -19,13 +19,13 @@ interface ComparableTableProps {
 
 const sourceOptions: Array<{ value: "all" | ComparableCaseSource; label: string }> = [
   { value: "all", label: "すべて" },
-  { value: "csv", label: "自社CSV" },
-  { value: "mlit_transaction", label: "API取引" },
+  { value: "csv", label: "自社データ" },
+  { value: "mlit_transaction", label: "取引事例" },
   { value: "manual", label: "自社事例" }
 ];
 
 const sortableHeaders: Array<{ key: CaseSortKey; label: string }> = [
-  { key: "source", label: "ソース" },
+  { key: "source", label: "種別" },
   { key: "address", label: "所在地" },
   { key: "landAreaTsubo", label: "土地面積" },
   { key: "priceTotalYen", label: "価格" },
@@ -219,7 +219,7 @@ export default function ComparableTable({
             <tr>
               <th>選択</th>
               <th>
-                <SortButton active={sort.key === "source"} label="ソース" onClick={() => toggleSort("source")} />
+                <SortButton active={sort.key === "source"} label="種別" onClick={() => toggleSort("source")} />
               </th>
               <th>
                 <SortButton active={sort.key === "address"} label="所在地" onClick={() => toggleSort("address")} />
