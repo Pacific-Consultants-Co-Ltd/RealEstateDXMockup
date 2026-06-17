@@ -51,6 +51,12 @@ interface HistoryRow {
   growth: number;
 }
 
+interface AreaSourceItem {
+  address: string;
+  latitude: number;
+  longitude: number;
+}
+
 const emptyValuation = calculateValuation({
   selectedCases: [],
   landTsubo: 100,
@@ -94,10 +100,10 @@ function withDefaultSelection(items: ComparableCase[]): ComparableCase[] {
   return items.map((item) => (selectedIds.has(item.id) ? { ...item, selected: true } : item));
 }
 
-function buildAreaOptions(cases: ComparableCase[]): MapArea[] {
+function buildAreaOptions(items: AreaSourceItem[]): MapArea[] {
   const grouped = new Map<string, { label: string; latitude: number; longitude: number; count: number }>();
 
-  for (const item of cases) {
+  for (const item of items) {
     if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) {
       continue;
     }
@@ -123,6 +129,30 @@ function buildAreaOptions(cases: ComparableCase[]): MapArea[] {
       count: value.count
     }))
     .sort((left, right) => left.label.localeCompare(right.label, "ja"));
+}
+
+function caseSourceMatchesInformationType(comparable: ComparableCase, informationType: InformationType): boolean {
+  if (informationType === "取引事例") {
+    return comparable.source === "mlit_transaction";
+  }
+
+  if (informationType === "成約事例" || informationType === "自社データ") {
+    return comparable.source === "csv";
+  }
+
+  return false;
+}
+
+function isCaseInformationType(informationType: InformationType): boolean {
+  return informationType !== "公示地価";
+}
+
+function informationTypeNotice(informationType: InformationType): string | undefined {
+  if (informationType === "成約事例") {
+    return "成約事例データは現在デモデータで表示しています。";
+  }
+
+  return undefined;
 }
 
 function distanceMeters(left: { latitude: number; longitude: number }, right: { latitude: number; longitude: number }): number {
@@ -236,7 +266,9 @@ export default function DashboardPage() {
         requestJson<LandPriceResponse>("/api/reinfolib/land-price-points")
       ]);
 
-      const nextCases = withDefaultSelection([...(csv.cases ?? []), ...(transactions.cases ?? [])]);
+      const nextCsvCases = withDefaultSelection(csv.cases ?? []);
+      const nextTransactionCases = withDefaultSelection(transactions.cases ?? []);
+      const nextCases = [...nextCsvCases, ...nextTransactionCases];
       const nextLandPricePoints = landPrices.points ?? [];
       const initialLandPointIds = latestLandPoints(nextLandPricePoints)
         .slice(0, 1)
@@ -248,7 +280,7 @@ export default function DashboardPage() {
       setSelectedLandPointIds(initialLandPointIds);
       setValuation(
         calculateValuation({
-          selectedCases: nextCases.filter((item) => item.selected),
+          selectedCases: nextTransactionCases.filter((item) => item.selected),
           landTsubo: 100,
           growthRatePercent: initialGrowthRate,
           adjustmentPercent: 0
@@ -269,6 +301,28 @@ export default function DashboardPage() {
 
   function markDirty() {
     setCalculationDirty(true);
+  }
+
+  function handleInformationTypeChange(nextInformationType: InformationType) {
+    const nextSelectedCases = isCaseInformationType(nextInformationType)
+      ? cases.filter((item) => caseSourceMatchesInformationType(item, nextInformationType) && item.selected)
+      : [];
+    const nextGrowthRatePercent = averageGrowthRate(
+      landPricePoints.filter((point) => selectedLandPointIds.includes(point.pointId))
+    );
+
+    setInformationType(nextInformationType);
+    setShowAllProperties(true);
+    setSelectedAreaKeys([]);
+    setValuation(
+      calculateValuation({
+        selectedCases: nextSelectedCases,
+        landTsubo,
+        growthRatePercent: nextGrowthRatePercent,
+        adjustmentPercent
+      })
+    );
+    setCalculationDirty(false);
   }
 
   function handleToggleCase(id: string) {
@@ -314,21 +368,46 @@ export default function DashboardPage() {
   }
 
   const target = useMemo(() => currentTarget(address), [address]);
-  const areaOptions = useMemo(() => buildAreaOptions(cases), [cases]);
+  const latestPoints = useMemo(() => latestLandPoints(landPricePoints), [landPricePoints]);
+  const activeCases = useMemo(
+    () => cases.filter((item) => caseSourceMatchesInformationType(item, informationType)),
+    [cases, informationType]
+  );
+  const areaOptions = useMemo(
+    () => buildAreaOptions(informationType === "公示地価" ? latestPoints : activeCases),
+    [activeCases, informationType, latestPoints]
+  );
   const selectableAreaKeys = useMemo(() => new Set(areaOptions.map((area) => area.key)), [areaOptions]);
   const areaLabelByKey = useMemo(() => new Map(areaOptions.map((area) => [area.key, area.label])), [areaOptions]);
   const selectedAreaLabel = useMemo(
     () => selectedAreaKeys.map((key) => areaLabelByKey.get(key) ?? key.split("|").at(-1) ?? key).join(" / "),
     [areaLabelByKey, selectedAreaKeys]
   );
+  const modeNotice = useMemo(() => informationTypeNotice(informationType), [informationType]);
   const visibleCases = useMemo(
-    () => (showAllProperties ? cases : cases.filter((item) => selectedAreaKeys.includes(areaKeyFromAddress(item.address)))),
-    [cases, selectedAreaKeys, showAllProperties]
+    () =>
+      isCaseInformationType(informationType)
+        ? showAllProperties
+          ? activeCases
+          : activeCases.filter((item) => selectedAreaKeys.includes(areaKeyFromAddress(item.address)))
+        : [],
+    [activeCases, informationType, selectedAreaKeys, showAllProperties]
   );
   const selectedVisibleCases = useMemo(() => visibleCases.filter((item) => item.selected), [visibleCases]);
+  const visibleLatestPoints = useMemo(
+    () =>
+      informationType === "公示地価" && !showAllProperties
+        ? latestPoints.filter((point) => selectedAreaKeys.includes(areaKeyFromAddress(point.address)))
+        : latestPoints,
+    [informationType, latestPoints, selectedAreaKeys, showAllProperties]
+  );
+  const visibleSelectedLandPointIds = useMemo(
+    () => new Set(visibleLatestPoints.filter((point) => selectedLandPointIds.includes(point.pointId)).map((point) => point.pointId)),
+    [selectedLandPointIds, visibleLatestPoints]
+  );
   const selectedLandSeries = useMemo(
-    () => landPricePoints.filter((point) => selectedLandPointIds.includes(point.pointId)),
-    [landPricePoints, selectedLandPointIds]
+    () => landPricePoints.filter((point) => visibleSelectedLandPointIds.has(point.pointId)),
+    [landPricePoints, visibleSelectedLandPointIds]
   );
   const growthRatePercent = useMemo(() => averageGrowthRate(selectedLandSeries), [selectedLandSeries]);
   const draftValuation = useMemo(
@@ -342,7 +421,13 @@ export default function DashboardPage() {
     [adjustmentPercent, growthRatePercent, landTsubo, selectedVisibleCases]
   );
   const historyRows = useMemo(() => buildHistoryRows(selectedLandSeries), [selectedLandSeries]);
-  const latestPoints = useMemo(() => latestLandPoints(landPricePoints), [landPricePoints]);
+  const selectedLandPointCount = visibleSelectedLandPointIds.size;
+  const allItemsLabel = informationType === "公示地価" ? "全地点表示" : "全物件表示";
+  const hideAllItemsLabel = informationType === "公示地価" ? "全地点非表示" : "全物件非表示";
+  const hiddenItemsLabel = informationType === "公示地価" ? "地点非表示" : "物件非表示";
+  const draftUnitPriceLabel = selectedVisibleCases.length > 0 ? formatYenPerTsubo(draftValuation.averageTsuboUnitPrice) : "-";
+  const appraisalAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.appraisalAmount) : "-";
+  const bidAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-";
 
   return (
     <main className="report-app">
@@ -353,7 +438,7 @@ export default function DashboardPage() {
             <div className="report-info-table" aria-label="査定条件">
               <label className="report-info-row">
                 <span>情報種別</span>
-                <select value={informationType} onChange={(event) => setInformationType(event.target.value as InformationType)}>
+                <select value={informationType} onChange={(event) => handleInformationTypeChange(event.target.value as InformationType)}>
                   <option>取引事例</option>
                   <option>成約事例</option>
                   <option>公示地価</option>
@@ -382,9 +467,9 @@ export default function DashboardPage() {
           <div className="brand-panel">
             <div className="brand-bar">Panasonic Homes</div>
             <div className="valuation-strip" aria-label="査定結果">
-              <MetricBox label="単価相場" value={formatYenPerTsubo(draftValuation.averageTsuboUnitPrice)} />
+              <MetricBox label="単価相場" value={draftUnitPriceLabel} />
               <MetricBox label="上昇率" value={formatPercent(growthRatePercent)} />
-              <MetricBox label="査定金額" value={formatYen(valuation.appraisalAmount)} />
+              <MetricBox label="査定金額" value={appraisalAmountLabel} />
               <label className="metric-box editable">
                 <span>補正係数</span>
                 <input
@@ -397,7 +482,7 @@ export default function DashboardPage() {
                   }}
                 />
               </label>
-              <MetricBox label="入札額" value={formatYen(valuation.bidAmount)} strong />
+              <MetricBox label="入札額" value={bidAmountLabel} strong />
               <button className="report-recalculate-button" type="button" onClick={handleRecalculate}>
                 <RefreshCw aria-hidden="true" size={14} />
                 再計算
@@ -405,17 +490,24 @@ export default function DashboardPage() {
             </div>
             <div className="report-status-row">
               <span className="status-label">表示するエリアの選択</span>
-              <button className="report-toggle-button" type="button" onClick={handleToggleAllProperties}>
-                {showAllProperties ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
-                {showAllProperties ? "全物件非表示" : "全物件表示"}
-              </button>
-              <span className="status-value">{showAllProperties ? "全物件表示" : selectedAreaKeys.length > 0 ? selectedAreaLabel : "物件非表示"}</span>
+              <VisibilityToggleButton
+                allItemsLabel={allItemsLabel}
+                hideAllItemsLabel={hideAllItemsLabel}
+                showAllProperties={showAllProperties}
+                onToggle={handleToggleAllProperties}
+              />
+              <span className="status-value" translate="no">
+                <span hidden={!showAllProperties}>{allItemsLabel}</span>
+                <span hidden={showAllProperties || selectedAreaKeys.length === 0}>{selectedAreaLabel}</span>
+                <span hidden={showAllProperties || selectedAreaKeys.length > 0}>{hiddenItemsLabel}</span>
+              </span>
               {calculationDirty ? <strong className="dirty-label">未再計算</strong> : <strong className="clean-label">反映済み</strong>}
             </div>
           </div>
         </header>
 
         <ErrorFallbackBanner messages={warnings} />
+        {modeNotice ? <div className="mode-notice">{modeNotice}</div> : null}
 
         <section className="evidence-grid" aria-label="周辺資料">
           <div className="report-map">
@@ -462,8 +554,13 @@ export default function DashboardPage() {
           </section>
 
           <aside className="history-panel">
-            <div className="history-title">市場情報</div>
-            <LandPointTable points={latestPoints} selectedPointIds={selectedLandPointIds} onToggle={handleToggleLandPoint} />
+            <div className="history-title">公示地価</div>
+            <LandPointTable
+              emptyLabel={informationType === "公示地価" && !showAllProperties ? "選択エリア内の地価地点なし" : "地価地点なし"}
+              points={visibleLatestPoints}
+              selectedPointIds={selectedLandPointIds}
+              onToggle={handleToggleLandPoint}
+            />
             <HistoryTable rows={historyRows} />
           </aside>
         </section>
@@ -475,7 +572,7 @@ export default function DashboardPage() {
           growthRatePercent={growthRatePercent}
           landTsubo={landTsubo}
           selectedCaseCount={selectedVisibleCases.length}
-          selectedLandPointCount={selectedLandPointIds.length}
+          selectedLandPointCount={selectedLandPointCount}
           valuation={valuation}
           onAdjustmentPercentChange={(value) => {
             setAdjustmentPercent(value);
@@ -488,8 +585,17 @@ export default function DashboardPage() {
           onRecalculate={handleRecalculate}
         />
 
-        <SelectedCaseTable cases={selectedVisibleCases} />
-        <PropertyTable cases={visibleCases} selectedCount={selectedVisibleCases.length} onToggleCase={handleToggleCase} />
+        {isCaseInformationType(informationType) ? (
+          <>
+            <SelectedCaseTable cases={selectedVisibleCases} informationType={informationType} />
+            <PropertyTable
+              cases={visibleCases}
+              informationType={informationType}
+              selectedCount={selectedVisibleCases.length}
+              onToggleCase={handleToggleCase}
+            />
+          </>
+        ) : null}
       </section>
     </main>
   );
@@ -505,6 +611,39 @@ function MetricBox({ label, value, strong = false }: { label: string; value: str
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function VisibilityToggleButton({
+  allItemsLabel,
+  hideAllItemsLabel,
+  showAllProperties,
+  onToggle
+}: {
+  allItemsLabel: string;
+  hideAllItemsLabel: string;
+  showAllProperties: boolean;
+  onToggle: () => void;
+}) {
+  const activeLabel = showAllProperties ? hideAllItemsLabel : allItemsLabel;
+
+  return (
+    <button aria-label={activeLabel} className="report-toggle-button" type="button" translate="no" onClick={onToggle}>
+      <span aria-hidden="true" className="report-toggle-icon">
+        <span hidden={!showAllProperties}>
+          <EyeOff size={14} />
+        </span>
+        <span hidden={showAllProperties}>
+          <Eye size={14} />
+        </span>
+      </span>
+      <span className="report-toggle-label" hidden={!showAllProperties}>
+        {hideAllItemsLabel}
+      </span>
+      <span className="report-toggle-label" hidden={showAllProperties}>
+        {allItemsLabel}
+      </span>
+    </button>
   );
 }
 
@@ -557,11 +696,11 @@ function CalculationFlow({
           />
         </label>
         <Operator value="×" />
-        <FormulaValue label="坪単価相場" value={formatYenPerTsubo(draftValuation.averageTsuboUnitPrice)} />
+        <FormulaValue label="坪単価相場" value={selectedCaseCount > 0 ? formatYenPerTsubo(draftValuation.averageTsuboUnitPrice) : "-"} />
         <Operator value="×" />
         <FormulaValue label="地価上昇率" value={formatMultiplier(growthRatePercent)} />
         <Operator value="=" />
-        <FormulaValue label="査定額" value={formatYen(valuation.appraisalAmount)} strong />
+        <FormulaValue label="査定額" value={valuation.selectedCount > 0 ? formatYen(valuation.appraisalAmount) : "-"} strong />
         <Operator value="→" />
         <label className="formula-cell input-cell suffix-cell">
           <span>補正係数</span>
@@ -574,7 +713,7 @@ function CalculationFlow({
           <small>%</small>
         </label>
         <Operator value="=" />
-        <FormulaValue label="入札額" value={formatYen(valuation.bidAmount)} accent />
+        <FormulaValue label="入札額" value={valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-"} accent />
         <button className="recalculate-button" type="button" onClick={onRecalculate}>
           <RefreshCw aria-hidden="true" size={16} />
           再計算
@@ -628,10 +767,12 @@ function HistoryTable({ rows }: { rows: HistoryRow[] }) {
 }
 
 function LandPointTable({
+  emptyLabel,
   points,
   selectedPointIds,
   onToggle
 }: {
+  emptyLabel: string;
   points: PublicLandPricePoint[];
   selectedPointIds: string[];
   onToggle: (pointId: string) => void;
@@ -650,7 +791,7 @@ function LandPointTable({
         <tbody>
           {points.length === 0 ? (
             <tr>
-              <td colSpan={4}>地価地点なし</td>
+              <td colSpan={4}>{emptyLabel}</td>
             </tr>
           ) : null}
           {points.map((point) => (
@@ -677,11 +818,11 @@ function LandPointTable({
   );
 }
 
-function SelectedCaseTable({ cases }: { cases: ComparableCase[] }) {
+function SelectedCaseTable({ cases, informationType }: { cases: ComparableCase[]; informationType: InformationType }) {
   return (
     <section className="selected-case-panel">
       <div className="panel-heading compact selected-case-heading">
-        <h2>選択された事例の表示</h2>
+        <h2>選択された{informationType}の表示</h2>
         <p className="property-count">計算対象 {cases.length}件</p>
       </div>
       <div className="selected-case-table-wrap">
@@ -724,17 +865,19 @@ function SelectedCaseTable({ cases }: { cases: ComparableCase[] }) {
 
 function PropertyTable({
   cases,
+  informationType,
   selectedCount,
   onToggleCase
 }: {
   cases: ComparableCase[];
+  informationType: InformationType;
   selectedCount: number;
   onToggleCase: (id: string) => void;
 }) {
   return (
     <section className="property-panel">
       <div className="panel-heading compact property-heading">
-        <h2>市場情報</h2>
+        <h2>{informationType}</h2>
         <p className="property-count">
           表示中の全事例 {cases.length}件 / 選択 {selectedCount}件
         </p>
@@ -755,11 +898,11 @@ function PropertyTable({
             </tr>
           </thead>
           <tbody>
-            {cases.length === 0 ? (
-              <tr>
-                <td colSpan={9}>地図で町丁目を選択するか、全物件表示を有効にしてください。</td>
-              </tr>
-            ) : null}
+          {cases.length === 0 ? (
+            <tr>
+              <td colSpan={9}>地図で町丁目を選択するか、全物件表示を有効にしてください。</td>
+            </tr>
+          ) : null}
             {cases.map((comparable) => (
               <tr className={comparable.selected ? "active-row" : ""} key={comparable.id}>
                 <td>
