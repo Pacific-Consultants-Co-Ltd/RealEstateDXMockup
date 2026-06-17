@@ -1,11 +1,11 @@
 "use client";
 
-import L, { type LeafletMouseEvent } from "leaflet";
-import { useMemo } from "react";
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
+import L, { type LeafletMouseEvent, type PathOptions } from "leaflet";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
+import { GeoJSON as GeoJSONLayer, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 
-import { formatM2, formatPercent, formatTsubo, formatYenPerM2, formatYenPerTsubo } from "@/lib/formatters";
-import type { ComparableCase, PublicLandPricePoint, TargetLocation } from "@/lib/types";
+import type { TargetLocation } from "@/lib/types";
 
 export interface MapArea {
   key: string;
@@ -17,52 +17,77 @@ export interface MapArea {
 
 interface MapViewProps {
   areas: MapArea[];
-  cases: ComparableCase[];
-  landPricePoints: PublicLandPricePoint[];
   selectedAreaKeys: string[];
-  selectedLandPointIds: string[];
   target: TargetLocation;
-  onMapAreaClick: (latitude: number, longitude: number) => void;
-  onToggleCase: (id: string) => void;
-  onToggleLandPoint: (pointId: string) => void;
+  onToggleArea: (areaKey: string) => void;
 }
 
-function comparableIcon(comparable: ComparableCase) {
-  return L.divIcon({
-    className: "marker-shell",
-    html: `<span class="case-marker ${comparable.selected ? "selected" : ""} source-${comparable.source}"></span>`,
-    iconAnchor: [12, 12],
-    iconSize: [24, 24]
-  });
-}
+type BoundaryProperties = {
+  areaKey?: string;
+  areaLabel?: string;
+  CITY_NAME?: string;
+  S_NAME?: string;
+};
 
-function landPriceIcon(selected: boolean) {
-  return L.divIcon({
-    className: "marker-shell",
-    html: `<span class="land-price-marker ${selected ? "selected" : ""}"></span>`,
-    iconAnchor: [10, 10],
-    iconSize: [20, 20]
-  });
-}
-
-function targetIcon() {
-  return L.divIcon({
-    className: "marker-shell",
-    html: `<span class="target-marker"></span>`,
-    iconAnchor: [15, 30],
-    iconSize: [30, 30]
-  });
-}
+type BoundaryFeature = Feature<Geometry, BoundaryProperties>;
+type BoundaryFeatureCollection = FeatureCollection<Geometry, BoundaryProperties>;
 
 function stopMapClick(event: LeafletMouseEvent) {
   L.DomEvent.stopPropagation(event.originalEvent);
 }
 
-function MapClickHandler({ onMapAreaClick }: { onMapAreaClick: (latitude: number, longitude: number) => void }) {
+function boundaryStyleForSelection(
+  feature: BoundaryFeature | undefined,
+  selectedAreaSet: ReadonlySet<string>,
+  availableAreaSet: ReadonlySet<string>
+): PathOptions {
+  const areaKey = feature?.properties?.areaKey ?? "";
+  const selected = selectedAreaSet.has(areaKey);
+  const hasMarketData = availableAreaSet.has(areaKey);
+
+  if (!hasMarketData) {
+    return {
+      color: "#708090",
+      fillColor: "#708090",
+      fillOpacity: 0.012,
+      opacity: 0.28,
+      weight: 0.7
+    };
+  }
+
+  return {
+    color: selected ? "#d71920" : "#375f96",
+    fillColor: selected ? "#d71920" : "#5b8fc7",
+    fillOpacity: selected ? 0.18 : 0.055,
+    opacity: selected ? 0.95 : 0.72,
+    weight: selected ? 2.4 : 1.2
+  };
+}
+
+function boundsToBbox(bounds: L.LatLngBounds): string {
+  const latPadding = Math.max((bounds.getNorth() - bounds.getSouth()) * 0.12, 0.004);
+  const lngPadding = Math.max((bounds.getEast() - bounds.getWest()) * 0.12, 0.004);
+  const west = bounds.getWest() - lngPadding;
+  const south = bounds.getSouth() - latPadding;
+  const east = bounds.getEast() + lngPadding;
+  const north = bounds.getNorth() + latPadding;
+
+  return [west, south, east, north].map((value) => value.toFixed(6)).join(",");
+}
+
+function BoundaryViewport({ onBboxChange }: { onBboxChange: (bbox: string) => void }) {
+  const map = useMap();
+  const updateBbox = useCallback(() => {
+    onBboxChange(boundsToBbox(map.getBounds()));
+  }, [map, onBboxChange]);
+
+  useEffect(() => {
+    updateBbox();
+  }, [updateBbox]);
+
   useMapEvents({
-    click(event) {
-      onMapAreaClick(event.latlng.lat, event.latlng.lng);
-    }
+    moveend: updateBbox,
+    zoomend: updateBbox
   });
 
   return null;
@@ -83,35 +108,11 @@ function MapLegend() {
         </summary>
         <div className="map-legend-grid">
           <span className="map-legend-item">
-            <i className="legend-symbol legend-target" aria-hidden="true" />
-            対象地
-          </span>
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-case-csv" aria-hidden="true" />
-            CSV事例
-          </span>
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-case-mlit" aria-hidden="true" />
-            取引価格情報
-          </span>
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-case-selected" aria-hidden="true" />
-            選択事例
-          </span>
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-land" aria-hidden="true" />
-            公示地価
-          </span>
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-land-selected" aria-hidden="true" />
-            選択地価
-          </span>
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-radius" aria-hidden="true" />
-            1km圏
-          </span>
-          <span className="map-legend-item">
             <i className="legend-symbol legend-area" aria-hidden="true" />
+            町丁目境界
+          </span>
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-area-selected" aria-hidden="true" />
             選択町丁目
           </span>
         </div>
@@ -122,147 +123,138 @@ function MapLegend() {
 
 export default function MapView({
   areas,
-  cases,
-  landPricePoints,
   selectedAreaKeys,
-  selectedLandPointIds,
   target,
-  onMapAreaClick,
-  onToggleCase,
-  onToggleLandPoint
+  onToggleArea
 }: MapViewProps) {
-  const latestLandPoints = useMemo(() => {
-    const byPoint = new Map<string, PublicLandPricePoint>();
-    for (const point of landPricePoints) {
-      const current = byPoint.get(point.pointId);
-      if (!current || current.year < point.year) {
-        byPoint.set(point.pointId, point);
+  const [boundaryData, setBoundaryData] = useState<BoundaryFeatureCollection | null>(null);
+  const [boundaryError, setBoundaryError] = useState(false);
+  const [boundaryBbox, setBoundaryBbox] = useState("");
+  const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
+
+  const areaByKey = useMemo(() => new Map(areas.map((area) => [area.key, area])), [areas]);
+  const availableAreaSet = useMemo(() => new Set(areas.map((area) => area.key)), [areas]);
+  const selectedAreaSet = useMemo(() => new Set(selectedAreaKeys), [selectedAreaKeys]);
+  const availableAreaSetRef = useRef(availableAreaSet);
+  const selectedAreaSetRef = useRef(selectedAreaSet);
+  const boundaryLayerKey = useMemo(() => `boundaries-${boundaryBbox}`, [boundaryBbox]);
+  const handleBboxChange = useCallback((bbox: string) => {
+    setBoundaryBbox((current) => (current === bbox ? current : bbox));
+  }, []);
+  const boundaryStyle = useCallback(
+    (feature?: BoundaryFeature) => boundaryStyleForSelection(feature, selectedAreaSet, availableAreaSet),
+    [availableAreaSet, selectedAreaSet]
+  );
+
+  useEffect(() => {
+    availableAreaSetRef.current = availableAreaSet;
+    selectedAreaSetRef.current = selectedAreaSet;
+  }, [availableAreaSet, selectedAreaSet]);
+
+  useEffect(() => {
+    if (!boundaryBbox) {
+      setBoundaryData(null);
+      setBoundaryError(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadBoundaries() {
+      try {
+        const params = new URLSearchParams();
+        params.set("bbox", boundaryBbox);
+
+        const response = await fetch(`/api/boundaries/osaka?${params.toString()}`, {
+          cache: "force-cache",
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error("Boundary request failed.");
+        }
+
+        const payload = (await response.json()) as BoundaryFeatureCollection;
+        setBoundaryData(payload);
+        setBoundaryError(false);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setBoundaryData(null);
+          setBoundaryError(true);
+        }
       }
     }
 
-    return Array.from(byPoint.values());
-  }, [landPricePoints]);
+    void loadBoundaries();
 
-  const selectedAreas = areas.filter((area) => selectedAreaKeys.includes(area.key));
+    return () => controller.abort();
+  }, [boundaryBbox]);
+
+  useEffect(() => {
+    boundaryLayerRef.current?.eachLayer((layer) => {
+      const feature = (layer as L.Layer & { feature?: BoundaryFeature }).feature;
+
+      if (feature && layer instanceof L.Path) {
+        layer.setStyle(boundaryStyle(feature));
+      }
+    });
+  }, [boundaryData, boundaryStyle]);
+
+  function onEachBoundaryFeature(feature: BoundaryFeature, layer: L.Layer) {
+    const areaKey = feature.properties?.areaKey;
+
+    if (!areaKey) {
+      return;
+    }
+
+    const area = areaByKey.get(areaKey);
+    if (!area) {
+      return;
+    }
+
+    const label = area.label ?? feature.properties?.areaLabel ?? areaKey;
+    const countLabel = ` (${area.count})`;
+    layer.bindTooltip(`${label}${countLabel}`, { direction: "top", sticky: true });
+    layer.on({
+      click: (event: LeafletMouseEvent) => {
+        stopMapClick(event);
+        onToggleArea(areaKey);
+      },
+      mouseout: () => {
+        if (layer instanceof L.Path) {
+          layer.setStyle(boundaryStyleForSelection(feature, selectedAreaSetRef.current, availableAreaSetRef.current));
+        }
+      },
+      mouseover: () => {
+        if (layer instanceof L.Path) {
+          const selected = selectedAreaSetRef.current.has(areaKey);
+          layer.setStyle({
+            fillOpacity: selected ? 0.24 : 0.12,
+            weight: selected ? 2.8 : 1.8
+          });
+        }
+      }
+    });
+  }
 
   return (
     <section className="map-panel">
       <div className="map-frame">
-        <MapContainer center={[target.latitude, target.longitude]} scrollWheelZoom zoom={13}>
-          <MapClickHandler onMapAreaClick={onMapAreaClick} />
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Circle
-            center={[target.latitude, target.longitude]}
-            pathOptions={{ color: "#375f96", fillColor: "#5b8fc7", fillOpacity: 0.06, weight: 1.5 }}
-            radius={1000}
-          />
-          {selectedAreas.map((area) => (
-            <Circle
-              center={[area.latitude, area.longitude]}
-              key={area.key}
-              pathOptions={{ color: "#d71920", fillColor: "#d71920", fillOpacity: 0.12, weight: 2 }}
-              radius={460}
+        <MapContainer attributionControl={false} center={[target.latitude, target.longitude]} scrollWheelZoom zoom={13}>
+          <BoundaryViewport onBboxChange={handleBboxChange} />
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          {boundaryData ? (
+            <GeoJSONLayer
+              data={boundaryData}
+              key={boundaryLayerKey}
+              ref={boundaryLayerRef}
+              onEachFeature={onEachBoundaryFeature}
+              style={boundaryStyle}
             />
-          ))}
-          <Marker icon={targetIcon()} position={[target.latitude, target.longitude]}>
-            <Popup>
-              <div className="map-popup">
-                <strong>対象地</strong>
-                <p>{target.address}</p>
-              </div>
-            </Popup>
-          </Marker>
-
-          {cases.map((comparable) => (
-            <Marker
-              eventHandlers={{
-                click: (event) => {
-                  stopMapClick(event);
-                  onToggleCase(comparable.id);
-                }
-              }}
-              icon={comparableIcon(comparable)}
-              key={comparable.id}
-              position={[comparable.latitude, comparable.longitude]}
-            >
-              <Popup>
-                <div className="map-popup">
-                  <strong>{comparable.address}</strong>
-                  <dl>
-                    <div>
-                      <dt>価格</dt>
-                      <dd>{comparable.priceTotalDisplay || "-"}</dd>
-                    </div>
-                    <div>
-                      <dt>土地面積</dt>
-                      <dd>
-                        {formatTsubo(comparable.landAreaTsubo)} / {formatM2(comparable.landAreaM2)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>坪単価</dt>
-                      <dd>{formatYenPerTsubo(comparable.unitPricePerTsubo)}</dd>
-                    </div>
-                    <div>
-                      <dt>用途地域</dt>
-                      <dd>{comparable.zoning || "-"}</dd>
-                    </div>
-                    <div>
-                      <dt>取引時期</dt>
-                      <dd>{comparable.transactionDate || "-"}</dd>
-                    </div>
-                  </dl>
-                  <button className="popup-button" type="button" onClick={() => onToggleCase(comparable.id)}>
-                    {comparable.selected ? "選択解除" : "選択"}
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-
-          {latestLandPoints.map((point) => {
-            const selected = selectedLandPointIds.includes(point.pointId);
-
-            return (
-              <Marker
-                eventHandlers={{
-                  click: (event) => {
-                    stopMapClick(event);
-                    onToggleLandPoint(point.pointId);
-                  }
-                }}
-                icon={landPriceIcon(selected)}
-                key={point.id}
-                position={[point.latitude, point.longitude]}
-              >
-                <Popup>
-                  <div className="map-popup">
-                    <strong>{point.standardLotNumber || point.pointId}</strong>
-                    <p>{point.address}</p>
-                    <dl>
-                      <div>
-                        <dt>価格</dt>
-                        <dd>{formatYenPerM2(point.pricePerM2)}</dd>
-                      </div>
-                      <div>
-                        <dt>前年比</dt>
-                        <dd>{formatPercent(point.yearOnYearChangeRate)}</dd>
-                      </div>
-                      <div>
-                        <dt>最寄駅</dt>
-                        <dd>{point.nearestStation || "-"}</dd>
-                      </div>
-                    </dl>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
+          ) : null}
         </MapContainer>
         <MapLegend />
+        {boundaryError ? <div className="map-boundary-status">境界データを読み込めませんでした</div> : null}
       </div>
     </section>
   );

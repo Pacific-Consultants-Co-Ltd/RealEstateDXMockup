@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import ErrorFallbackBanner from "@/components/ErrorFallbackBanner";
 import LoadingState from "@/components/LoadingState";
 import type { MapArea } from "@/components/MapView";
+import { areaKeyFromAddress, areaLabelFromAddress, normalizeAddress } from "@/lib/areaKeys";
 import {
   formatM2,
   formatPercent,
@@ -93,42 +94,30 @@ function withDefaultSelection(items: ComparableCase[]): ComparableCase[] {
   return items.map((item) => (selectedIds.has(item.id) ? { ...item, selected: true } : item));
 }
 
-function normalizeAddress(address: string): string {
-  return address.replace(/\s+/g, "").replace(/^大阪府/, "");
-}
-
-function townKey(address: string): string {
-  const normalized = normalizeAddress(address);
-  const adminIndex = Math.max(normalized.lastIndexOf("区"), normalized.lastIndexOf("市"));
-  const tail = adminIndex >= 0 ? normalized.slice(adminIndex + 1) : normalized;
-  const chome = tail.match(/^(.+?[0-9０-９]+丁目)/);
-
-  return chome?.[1] || tail.slice(0, 10) || address;
-}
-
 function buildAreaOptions(cases: ComparableCase[]): MapArea[] {
-  const grouped = new Map<string, { latitude: number; longitude: number; count: number }>();
+  const grouped = new Map<string, { label: string; latitude: number; longitude: number; count: number }>();
 
   for (const item of cases) {
     if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) {
       continue;
     }
 
-    const key = townKey(item.address);
+    const key = areaKeyFromAddress(item.address);
+    const label = areaLabelFromAddress(item.address);
     const current = grouped.get(key);
     if (current) {
       current.latitude += item.latitude;
       current.longitude += item.longitude;
       current.count += 1;
     } else {
-      grouped.set(key, { latitude: item.latitude, longitude: item.longitude, count: 1 });
+      grouped.set(key, { label, latitude: item.latitude, longitude: item.longitude, count: 1 });
     }
   }
 
   return Array.from(grouped.entries())
     .map(([key, value]) => ({
       key,
-      label: key,
+      label: value.label,
       latitude: value.latitude / value.count,
       longitude: value.longitude / value.count,
       count: value.count
@@ -147,16 +136,6 @@ function distanceMeters(left: { latitude: number; longitude: number }, right: { 
     Math.cos(leftLat) * Math.cos(rightLat) * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
 
   return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function findNearestArea(areas: MapArea[], latitude: number, longitude: number): MapArea | undefined {
-  return areas
-    .map((area) => ({
-      area,
-      distance: distanceMeters({ latitude, longitude }, { latitude: area.latitude, longitude: area.longitude })
-    }))
-    .filter((candidate) => candidate.distance <= 1600)
-    .sort((left, right) => left.distance - right.distance)[0]?.area;
 }
 
 function latestLandPoints(points: PublicLandPricePoint[]): PublicLandPricePoint[] {
@@ -310,15 +289,14 @@ export default function DashboardPage() {
     markDirty();
   }
 
-  function handleMapAreaClick(latitude: number, longitude: number) {
-    const nearestArea = findNearestArea(areaOptions, latitude, longitude);
-    if (!nearestArea) {
+  function handleToggleMapArea(areaKey: string) {
+    if (!selectableAreaKeys.has(areaKey)) {
       return;
     }
 
     setShowAllProperties(false);
     setSelectedAreaKeys((current) =>
-      current.includes(nearestArea.key) ? current.filter((key) => key !== nearestArea.key) : [...current, nearestArea.key]
+      current.includes(areaKey) ? current.filter((key) => key !== areaKey) : [...current, areaKey]
     );
     markDirty();
   }
@@ -337,8 +315,14 @@ export default function DashboardPage() {
 
   const target = useMemo(() => currentTarget(address), [address]);
   const areaOptions = useMemo(() => buildAreaOptions(cases), [cases]);
+  const selectableAreaKeys = useMemo(() => new Set(areaOptions.map((area) => area.key)), [areaOptions]);
+  const areaLabelByKey = useMemo(() => new Map(areaOptions.map((area) => [area.key, area.label])), [areaOptions]);
+  const selectedAreaLabel = useMemo(
+    () => selectedAreaKeys.map((key) => areaLabelByKey.get(key) ?? key.split("|").at(-1) ?? key).join(" / "),
+    [areaLabelByKey, selectedAreaKeys]
+  );
   const visibleCases = useMemo(
-    () => (showAllProperties ? cases : cases.filter((item) => selectedAreaKeys.includes(townKey(item.address)))),
+    () => (showAllProperties ? cases : cases.filter((item) => selectedAreaKeys.includes(areaKeyFromAddress(item.address)))),
     [cases, selectedAreaKeys, showAllProperties]
   );
   const selectedVisibleCases = useMemo(() => visibleCases.filter((item) => item.selected), [visibleCases]);
@@ -425,7 +409,7 @@ export default function DashboardPage() {
                 {showAllProperties ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
                 {showAllProperties ? "全物件非表示" : "全物件表示"}
               </button>
-              <span className="status-value">{showAllProperties ? "全物件表示" : selectedAreaKeys.length > 0 ? selectedAreaKeys.join(" / ") : "物件非表示"}</span>
+              <span className="status-value">{showAllProperties ? "全物件表示" : selectedAreaKeys.length > 0 ? selectedAreaLabel : "物件非表示"}</span>
               {calculationDirty ? <strong className="dirty-label">未再計算</strong> : <strong className="clean-label">反映済み</strong>}
             </div>
           </div>
@@ -442,14 +426,9 @@ export default function DashboardPage() {
               ) : (
                 <MapView
                   areas={areaOptions}
-                  cases={visibleCases}
-                  landPricePoints={landPricePoints}
                   selectedAreaKeys={selectedAreaKeys}
-                  selectedLandPointIds={selectedLandPointIds}
                   target={target}
-                  onMapAreaClick={handleMapAreaClick}
-                  onToggleCase={handleToggleCase}
-                  onToggleLandPoint={handleToggleLandPoint}
+                  onToggleArea={handleToggleMapArea}
                 />
               )}
             </div>
@@ -725,7 +704,7 @@ function SelectedCaseTable({ cases }: { cases: ComparableCase[] }) {
             ) : null}
             {cases.map((comparable) => (
               <tr key={comparable.id}>
-                <td>{townKey(comparable.address)}</td>
+                <td>{areaLabelFromAddress(comparable.address)}</td>
                 <td>{compactAddress(comparable.address)}</td>
                 <td>
                   {formatTsubo(comparable.landAreaTsubo)}
@@ -791,7 +770,7 @@ function PropertyTable({
                     onChange={() => onToggleCase(comparable.id)}
                   />
                 </td>
-                <td>{townKey(comparable.address)}</td>
+                <td>{areaLabelFromAddress(comparable.address)}</td>
                 <td>{compactAddress(comparable.address)}</td>
                 <td>
                   <strong>{stationLabel(comparable)}</strong>
