@@ -1,6 +1,6 @@
 "use client";
 
-import L, { type LeafletMouseEvent, type PathOptions } from "leaflet";
+import L, { type LatLngBoundsExpression, type LeafletMouseEvent, type PathOptions } from "leaflet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { GeoJSON as GeoJSONLayer, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
@@ -32,6 +32,11 @@ type BoundaryProperties = {
 type BoundaryFeature = Feature<Geometry, BoundaryProperties>;
 type BoundaryFeatureCollection = FeatureCollection<Geometry, BoundaryProperties>;
 type BoundaryLayerFilter = "all" | "market-data";
+
+const OSAKA_MAP_BOUNDS: LatLngBoundsExpression = [
+  [34.271799, 135.091699],
+  [35.051394, 135.746794]
+];
 
 const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[] = [
   { value: "all", label: "すべて" },
@@ -318,7 +323,15 @@ export default function MapView({
   return (
     <section className="map-panel">
       <div className="map-frame">
-        <MapContainer attributionControl={false} center={[target.latitude, target.longitude]} scrollWheelZoom zoom={13}>
+        <MapContainer
+          attributionControl={false}
+          center={[target.latitude, target.longitude]}
+          maxBounds={OSAKA_MAP_BOUNDS}
+          maxBoundsViscosity={1}
+          minZoom={9}
+          scrollWheelZoom
+          zoom={13}
+        >
           <BoundaryViewport onBboxChange={handleBboxChange} />
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {visibleBoundaryData ? (
