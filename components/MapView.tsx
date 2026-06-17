@@ -58,9 +58,9 @@ function boundaryStyleForSelection(
   return {
     color: selected ? "#d71920" : "#255f9e",
     fillColor: selected ? "#d71920" : "#3f86c9",
-    fillOpacity: selected ? 0.24 : 0.105,
-    opacity: selected ? 1 : 0.88,
-    weight: selected ? 2.7 : 1.55
+    fillOpacity: selected ? 0.28 : 0.14,
+    opacity: selected ? 1 : 0.95,
+    weight: selected ? 4 : 3
   };
 }
 
@@ -229,8 +229,8 @@ export default function MapView({
         if (layer instanceof L.Path) {
           const selected = selectedAreaSetRef.current.has(areaKey);
           layer.setStyle({
-            fillOpacity: selected ? 0.24 : 0.12,
-            weight: selected ? 2.8 : 1.8
+            fillOpacity: selected ? 0.32 : 0.18,
+            weight: selected ? 3.1 : 2
           });
         }
       }
