@@ -255,6 +255,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [valuation, setValuation] = useState<ValuationResult>(emptyValuation);
   const [calculationDirty, setCalculationDirty] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
 
   async function loadAllData() {
     setLoading(true);
@@ -297,6 +298,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     void loadAllData();
+  }, []);
+
+  useEffect(() => {
+    function handleScroll() {
+      setHeaderScrolled(window.scrollY > 0);
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   function markDirty() {
@@ -426,73 +438,53 @@ export default function DashboardPage() {
   return (
     <main className="report-app">
       <section className="report-sheet" aria-label="用地取得査定">
-        <header className="report-header-grid">
-          <div className="labeled-block input-block">
-            <SectionLabel label="入力部分" />
-            <div className="report-info-table" aria-label="査定条件">
-              <label className="report-info-row">
-                <span>情報種別</span>
-                <select value={informationType} onChange={(event) => handleInformationTypeChange(event.target.value as InformationType)}>
-                  <option>取引事例</option>
-                  <option>成約事例</option>
-                  <option>公示地価</option>
-                  <option>自社データ</option>
-                </select>
-              </label>
-              <label className="report-info-row">
-                <span>所在地</span>
-                <input value={address} onChange={(event) => setAddress(event.target.value)} />
-              </label>
-              <label className="report-info-row">
-                <span>敷地面積</span>
-                <input
-                  inputMode="decimal"
-                  type="number"
-                  value={landTsubo}
-                  onChange={(event) => {
-                    setLandTsubo(Number(event.target.value) || 0);
-                    markDirty();
-                  }}
-                />
-              </label>
-            </div>
+        <header className="report-header">
+          <div className={`report-masthead${headerScrolled ? " is-scrolled" : ""}`}>
+            <img
+              className="brand-bar"
+              src={headerScrolled ? "/logo_panasonichomes.png" : "/logo_panasonichomes_tagline.svg"}
+              alt="Panasonic Homes"
+            />
           </div>
 
-          <div className="brand-panel">
-            <div className="brand-bar">Panasonic Homes</div>
-            <div className="valuation-strip" aria-label="査定結果">
-              <MetricBox label="単価相場" value={draftUnitPriceLabel} />
-              <MetricBox label="上昇率" value={formatPercent(growthRatePercent)} />
-              <MetricBox label="査定金額" value={appraisalAmountLabel} />
-              <label className="metric-box editable">
-                <span>補正係数</span>
-                <input
-                  inputMode="decimal"
-                  type="number"
-                  value={adjustmentPercent}
-                  onChange={(event) => {
-                    setAdjustmentPercent(Number(event.target.value) || 0);
-                    markDirty();
-                  }}
-                />
-              </label>
-              <MetricBox label="入札額" value={bidAmountLabel} strong />
-              <div className="recalculate-controls">
-                {calculationDirty ? <strong className="dirty-label">未再計算</strong> : null}
-                <button className="report-recalculate-button" type="button" onClick={handleRecalculate}>
-                  <RefreshCw aria-hidden="true" size={14} />
-                  再計算
-                </button>
+          <div className="report-header-grid">
+            <div className="labeled-block input-block">
+              <div className="report-info-table" aria-label="査定条件">
+                <label className="report-info-row">
+                  <span>情報種別</span>
+                  <select value={informationType} onChange={(event) => handleInformationTypeChange(event.target.value as InformationType)}>
+                    <option>取引事例</option>
+                    <option>成約事例</option>
+                    <option>公示地価</option>
+                    <option>自社データ</option>
+                  </select>
+                </label>
+                <label className="report-info-row">
+                  <span>所在地</span>
+                  <input value={address} onChange={(event) => setAddress(event.target.value)} />
+                </label>
+                <label className="report-info-row">
+                  <span>敷地面積</span>
+                  <input
+                    inputMode="decimal"
+                    type="number"
+                    value={landTsubo}
+                    onChange={(event) => {
+                      setLandTsubo(Number(event.target.value) || 0);
+                      markDirty();
+                    }}
+                  />
+                </label>
               </div>
             </div>
-            <div className="report-status-row">
-              <span className="status-label">表示するエリアの選択</span>
-              <VisibilityToggleButton
-                allItemsLabel={allItemsLabel}
-                hideAllItemsLabel={hideAllItemsLabel}
-                showAllProperties={showAllProperties}
-                onToggle={handleToggleAllProperties}
-              />
+
+            <div className="brand-panel">
+              <div className="valuation-strip" aria-label="査定結果">
+                <MetricBox label="単価相場" value={draftUnitPriceLabel} />
+                <MetricBox label="上昇率" value={formatPercent(growthRatePercent)} />
+                <MetricBox label="査定金額" value={appraisalAmountLabel} />
+                <MetricBox label="入札額" value={bidAmountLabel} strong />
+              </div>
             </div>
           </div>
         </header>
@@ -502,7 +494,15 @@ export default function DashboardPage() {
 
         <section className="evidence-grid" aria-label="周辺資料">
           <div className="report-map">
-            <SectionLabel label="表示するエリアの選択" />
+            <div className="section-toolbar">
+              <SectionLabel label="エリア" />
+              <VisibilityToggleButton
+                allItemsLabel={allItemsLabel}
+                hideAllItemsLabel={hideAllItemsLabel}
+                showAllProperties={showAllProperties}
+                onToggle={handleToggleAllProperties}
+              />
+            </div>
             <div className="report-map-body">
               {loading && cases.length === 0 ? (
                 <LoadingState label="市場データを読み込んでいます" />
@@ -518,30 +518,29 @@ export default function DashboardPage() {
           </div>
 
           <section className="report-chart" aria-label="公示地価推移">
-            <SectionLabel label="市場見通し" />
-            <div className="small-section-title">選択地点の地価推移</div>
-              {historyRows.length === 0 ? (
-                <LoadingState label="地価地点を選択" />
-              ) : (
-                <ResponsiveContainer height="100%" width="100%">
-                  <BarChart barCategoryGap="18%" data={historyRows} margin={{ top: 10, right: 4, bottom: 2, left: 0 }}>
-                    <CartesianGrid stroke="#e6e8ec" vertical={false} />
-                    <XAxis dataKey="year" fontSize={10} interval={0} minTickGap={0} tickLine={false} tickMargin={6} />
-                    <YAxis fontSize={10} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} width={34} />
-                    <Tooltip
-                      formatter={(value, name) => {
-                        if (name === "価格") {
-                          return [formatYenPerM2(Number(value)), name];
-                        }
+            <SectionLabel label="地価推移" />
+            {historyRows.length === 0 ? (
+              <LoadingState label="地価地点を選択" />
+            ) : (
+              <ResponsiveContainer height="100%" width="100%">
+                <BarChart barCategoryGap="18%" data={historyRows} margin={{ top: 10, right: 4, bottom: 2, left: 0 }}>
+                  <CartesianGrid stroke="#e6e8ec" vertical={false} />
+                  <XAxis dataKey="year" fontSize={10} interval={0} minTickGap={0} tickLine={false} tickMargin={6} />
+                  <YAxis fontSize={10} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} width={34} />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === "価格") {
+                        return [formatYenPerM2(Number(value)), name];
+                      }
 
-                        return [formatPercent(Number(value)), name];
-                      }}
-                      labelFormatter={(label) => `${label}年`}
-                    />
-                    <Bar dataKey="price" fill="#d71920" maxBarSize={24} name="価格" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+                      return [formatPercent(Number(value)), name];
+                    }}
+                    labelFormatter={(label) => `${label}年`}
+                  />
+                  <Bar dataKey="price" fill="#b42318" maxBarSize={24} name="価格" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </section>
 
           <aside className="history-panel">
@@ -567,10 +566,6 @@ export default function DashboardPage() {
           valuation={valuation}
           onAdjustmentPercentChange={(value) => {
             setAdjustmentPercent(value);
-            markDirty();
-          }}
-          onLandTsuboChange={(value) => {
-            setLandTsubo(value);
             markDirty();
           }}
           onRecalculate={handleRecalculate}
@@ -648,7 +643,6 @@ function CalculationFlow({
   selectedLandPointCount,
   valuation,
   onAdjustmentPercentChange,
-  onLandTsuboChange,
   onRecalculate
 }: {
   adjustmentPercent: number;
@@ -660,14 +654,13 @@ function CalculationFlow({
   selectedLandPointCount: number;
   valuation: ValuationResult;
   onAdjustmentPercentChange: (value: number) => void;
-  onLandTsuboChange: (value: number) => void;
   onRecalculate: () => void;
 }) {
   return (
     <section className="calculation-panel">
       <div className="panel-heading compact">
         <div>
-          <h2>計算部分</h2>
+          <h2>計算</h2>
           <p>
             物件 {selectedCaseCount}件 / 地価 {selectedLandPointCount}地点
           </p>
@@ -676,16 +669,7 @@ function CalculationFlow({
       </div>
 
       <div className="formula-row">
-        <label className="formula-cell input-cell">
-          <span>用地坪数</span>
-          <input
-            inputMode="decimal"
-            min="0"
-            type="number"
-            value={landTsubo}
-            onChange={(event) => onLandTsuboChange(Number(event.target.value) || 0)}
-          />
-        </label>
+        <FormulaValue label="用地坪数" value={formatTsubo(landTsubo)} />
         <Operator value="×" />
         <FormulaValue label="坪単価相場" value={selectedCaseCount > 0 ? formatYenPerTsubo(draftValuation.averageTsuboUnitPrice) : "-"} />
         <Operator value="×" />
@@ -813,7 +797,7 @@ function SelectedCaseTable({ cases, informationType }: { cases: ComparableCase[]
   return (
     <section className="selected-case-panel">
       <div className="panel-heading compact selected-case-heading">
-        <h2>選択された{informationType}の表示</h2>
+        <h2>選択中の{informationType}</h2>
         <p className="property-count">計算対象 {cases.length}件</p>
       </div>
       <div className="selected-case-table-wrap">
@@ -831,7 +815,7 @@ function SelectedCaseTable({ cases, informationType }: { cases: ComparableCase[]
           <tbody>
             {cases.length === 0 ? (
               <tr>
-                <td colSpan={6}>選択された事例はありません。</td>
+                <td colSpan={6}>選択なし</td>
               </tr>
             ) : null}
             {cases.map((comparable) => (
@@ -891,7 +875,7 @@ function PropertyTable({
           <tbody>
           {cases.length === 0 ? (
             <tr>
-              <td colSpan={9}>地図で町丁目を選択するか、全物件表示を有効にしてください。</td>
+              <td colSpan={9}>表示対象なし</td>
             </tr>
           ) : null}
             {cases.map((comparable) => (

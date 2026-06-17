@@ -71,11 +71,11 @@ function boundaryStyleForSelection(
   }
 
   return {
-    color: selected ? "#d71920" : "#255f9e",
-    fillColor: selected ? "#d71920" : "#3f86c9",
-    fillOpacity: selected ? 0.28 : 0.14,
+    color: selected ? "#b42318" : "#175cd3",
+    fillColor: selected ? "#b42318" : "#528bdb",
+    fillOpacity: selected ? 0.24 : 0.12,
     opacity: selected ? 1 : 0.95,
-    weight: selected ? 4 : 3
+    weight: selected ? 3 : 2
   };
 }
 
