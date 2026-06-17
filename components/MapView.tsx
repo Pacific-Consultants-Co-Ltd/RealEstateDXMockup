@@ -31,9 +31,19 @@ type BoundaryProperties = {
 
 type BoundaryFeature = Feature<Geometry, BoundaryProperties>;
 type BoundaryFeatureCollection = FeatureCollection<Geometry, BoundaryProperties>;
+type BoundaryLayerFilter = "all" | "market-data";
+
+const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[] = [
+  { value: "all", label: "すべて" },
+  { value: "market-data", label: "市場データのみ" }
+];
 
 function stopMapClick(event: LeafletMouseEvent) {
   L.DomEvent.stopPropagation(event.originalEvent);
+}
+
+function featureHasMarketData(feature: BoundaryFeature, availableAreaSet: ReadonlySet<string>) {
+  return availableAreaSet.has(feature.properties?.areaKey ?? "");
 }
 
 function boundaryStyleForSelection(
@@ -95,28 +105,82 @@ function BoundaryViewport({ onBboxChange }: { onBboxChange: (bbox: string) => vo
 
 function MapLegend() {
   return (
-    <div className="map-legend-overlay">
-      <details
-        aria-label="地図凡例"
-        className="map-legend"
-        onClick={(event) => event.stopPropagation()}
-        onDoubleClick={(event) => event.stopPropagation()}
-      >
-        <summary>
-          <span className="legend-toggle-icon" aria-hidden="true" />
-          凡例
-        </summary>
-        <div className="map-legend-grid">
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-area" aria-hidden="true" />
-            町丁目境界
-          </span>
-          <span className="map-legend-item">
-            <i className="legend-symbol legend-area-selected" aria-hidden="true" />
-            選択町丁目
-          </span>
+    <details
+      aria-label="地図凡例"
+      className="map-legend"
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
+      <summary>
+        <span className="legend-toggle-icon" aria-hidden="true" />
+        凡例
+      </summary>
+      <div className="map-legend-grid">
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-area" aria-hidden="true" />
+          市場データあり
+        </span>
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-area-selected" aria-hidden="true" />
+          選択中
+        </span>
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-area-no-data" aria-hidden="true" />
+          データなし
+        </span>
+      </div>
+    </details>
+  );
+}
+
+function MapLayerFilter({
+  value,
+  onChange
+}: {
+  value: BoundaryLayerFilter;
+  onChange: (value: BoundaryLayerFilter) => void;
+}) {
+  return (
+    <details
+      aria-label="表示レイヤー"
+      className="map-legend map-layer-filter"
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
+      <summary>
+        <span className="legend-toggle-icon" aria-hidden="true" />
+        表示
+      </summary>
+      <div className="map-layer-filter-body">
+        <div className="map-layer-segmented" role="group" aria-label="表示する境界">
+          {boundaryLayerFilterOptions.map((option) => (
+            <button
+              aria-pressed={value === option.value}
+              className={`map-layer-option${value === option.value ? " is-active" : ""}`}
+              key={option.value}
+              onClick={() => onChange(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
-      </details>
+      </div>
+    </details>
+  );
+}
+
+function MapControls({
+  layerFilter,
+  onLayerFilterChange
+}: {
+  layerFilter: BoundaryLayerFilter;
+  onLayerFilterChange: (value: BoundaryLayerFilter) => void;
+}) {
+  return (
+    <div className="map-legend-overlay">
+      <MapLegend />
+      <MapLayerFilter value={layerFilter} onChange={onLayerFilterChange} />
     </div>
   );
 }
@@ -130,6 +194,7 @@ export default function MapView({
   const [boundaryData, setBoundaryData] = useState<BoundaryFeatureCollection | null>(null);
   const [boundaryError, setBoundaryError] = useState(false);
   const [boundaryBbox, setBoundaryBbox] = useState("");
+  const [boundaryLayerFilter, setBoundaryLayerFilter] = useState<BoundaryLayerFilter>("all");
   const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
 
   const areaByKey = useMemo(() => new Map(areas.map((area) => [area.key, area])), [areas]);
@@ -137,7 +202,20 @@ export default function MapView({
   const selectedAreaSet = useMemo(() => new Set(selectedAreaKeys), [selectedAreaKeys]);
   const availableAreaSetRef = useRef(availableAreaSet);
   const selectedAreaSetRef = useRef(selectedAreaSet);
-  const boundaryLayerKey = useMemo(() => `boundaries-${boundaryBbox}`, [boundaryBbox]);
+  const boundaryLayerKey = useMemo(() => `boundaries-${boundaryBbox}-${boundaryLayerFilter}`, [
+    boundaryBbox,
+    boundaryLayerFilter
+  ]);
+  const visibleBoundaryData = useMemo(() => {
+    if (!boundaryData || boundaryLayerFilter === "all") {
+      return boundaryData;
+    }
+
+    return {
+      ...boundaryData,
+      features: boundaryData.features.filter((feature) => featureHasMarketData(feature, availableAreaSet))
+    };
+  }, [availableAreaSet, boundaryData, boundaryLayerFilter]);
   const handleBboxChange = useCallback((bbox: string) => {
     setBoundaryBbox((current) => (current === bbox ? current : bbox));
   }, []);
@@ -198,7 +276,7 @@ export default function MapView({
         layer.setStyle(boundaryStyle(feature));
       }
     });
-  }, [boundaryData, boundaryStyle]);
+  }, [boundaryStyle, visibleBoundaryData]);
 
   function onEachBoundaryFeature(feature: BoundaryFeature, layer: L.Layer) {
     const areaKey = feature.properties?.areaKey;
@@ -243,9 +321,9 @@ export default function MapView({
         <MapContainer attributionControl={false} center={[target.latitude, target.longitude]} scrollWheelZoom zoom={13}>
           <BoundaryViewport onBboxChange={handleBboxChange} />
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {boundaryData ? (
+          {visibleBoundaryData ? (
             <GeoJSONLayer
-              data={boundaryData}
+              data={visibleBoundaryData}
               key={boundaryLayerKey}
               ref={boundaryLayerRef}
               onEachFeature={onEachBoundaryFeature}
@@ -253,7 +331,7 @@ export default function MapView({
             />
           ) : null}
         </MapContainer>
-        <MapLegend />
+        <MapControls layerFilter={boundaryLayerFilter} onLayerFilterChange={setBoundaryLayerFilter} />
         {boundaryError ? <div className="map-boundary-status">境界データを読み込めませんでした</div> : null}
       </div>
     </section>
