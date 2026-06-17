@@ -378,11 +378,6 @@ export default function DashboardPage() {
     [activeCases, informationType, latestPoints]
   );
   const selectableAreaKeys = useMemo(() => new Set(areaOptions.map((area) => area.key)), [areaOptions]);
-  const areaLabelByKey = useMemo(() => new Map(areaOptions.map((area) => [area.key, area.label])), [areaOptions]);
-  const selectedAreaLabel = useMemo(
-    () => selectedAreaKeys.map((key) => areaLabelByKey.get(key) ?? key.split("|").at(-1) ?? key).join(" / "),
-    [areaLabelByKey, selectedAreaKeys]
-  );
   const modeNotice = useMemo(() => informationTypeNotice(informationType), [informationType]);
   const visibleCases = useMemo(
     () =>
@@ -424,7 +419,6 @@ export default function DashboardPage() {
   const selectedLandPointCount = visibleSelectedLandPointIds.size;
   const allItemsLabel = informationType === "公示地価" ? "全地点表示" : "全物件表示";
   const hideAllItemsLabel = informationType === "公示地価" ? "全地点非表示" : "全物件非表示";
-  const hiddenItemsLabel = informationType === "公示地価" ? "地点非表示" : "物件非表示";
   const draftUnitPriceLabel = selectedVisibleCases.length > 0 ? formatYenPerTsubo(draftValuation.averageTsuboUnitPrice) : "-";
   const appraisalAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.appraisalAmount) : "-";
   const bidAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-";
@@ -483,10 +477,13 @@ export default function DashboardPage() {
                 />
               </label>
               <MetricBox label="入札額" value={bidAmountLabel} strong />
-              <button className="report-recalculate-button" type="button" onClick={handleRecalculate}>
-                <RefreshCw aria-hidden="true" size={14} />
-                再計算
-              </button>
+              <div className="recalculate-controls">
+                {calculationDirty ? <strong className="dirty-label">未再計算</strong> : null}
+                <button className="report-recalculate-button" type="button" onClick={handleRecalculate}>
+                  <RefreshCw aria-hidden="true" size={14} />
+                  再計算
+                </button>
+              </div>
             </div>
             <div className="report-status-row">
               <span className="status-label">表示するエリアの選択</span>
@@ -496,12 +493,6 @@ export default function DashboardPage() {
                 showAllProperties={showAllProperties}
                 onToggle={handleToggleAllProperties}
               />
-              <span className="status-value" translate="no">
-                <span hidden={!showAllProperties}>{allItemsLabel}</span>
-                <span hidden={showAllProperties || selectedAreaKeys.length === 0}>{selectedAreaLabel}</span>
-                <span hidden={showAllProperties || selectedAreaKeys.length > 0}>{hiddenItemsLabel}</span>
-              </span>
-              {calculationDirty ? <strong className="dirty-label">未再計算</strong> : <strong className="clean-label">反映済み</strong>}
             </div>
           </div>
         </header>
@@ -681,7 +672,7 @@ function CalculationFlow({
             物件 {selectedCaseCount}件 / 地価 {selectedLandPointCount}地点
           </p>
         </div>
-        {dirty ? <strong className="dirty-label">未再計算</strong> : <strong className="clean-label">反映済み</strong>}
+        {dirty ? <strong className="dirty-label">未再計算</strong> : null}
       </div>
 
       <div className="formula-row">
