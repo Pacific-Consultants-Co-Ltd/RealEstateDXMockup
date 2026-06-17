@@ -47,20 +47,20 @@ function boundaryStyleForSelection(
 
   if (!hasMarketData) {
     return {
-      color: "#708090",
+      color: "#5f6f80",
       fillColor: "#708090",
-      fillOpacity: 0.012,
-      opacity: 0.28,
-      weight: 0.7
+      fillOpacity: 0.035,
+      opacity: 0.48,
+      weight: 0.95
     };
   }
 
   return {
-    color: selected ? "#d71920" : "#375f96",
-    fillColor: selected ? "#d71920" : "#5b8fc7",
-    fillOpacity: selected ? 0.18 : 0.055,
-    opacity: selected ? 0.95 : 0.72,
-    weight: selected ? 2.4 : 1.2
+    color: selected ? "#d71920" : "#255f9e",
+    fillColor: selected ? "#d71920" : "#3f86c9",
+    fillOpacity: selected ? 0.24 : 0.105,
+    opacity: selected ? 1 : 0.88,
+    weight: selected ? 2.7 : 1.55
   };
 }
 
