@@ -526,7 +526,7 @@ export default function DashboardPage() {
             ) : (
               <ResponsiveContainer height="100%" width="100%">
                 <BarChart barCategoryGap="18%" data={historyRows} margin={{ top: 10, right: 4, bottom: 2, left: 0 }}>
-                  <CartesianGrid stroke="#e6e8ec" vertical={false} />
+                  <CartesianGrid stroke="#c1d0df" vertical={false} />
                   <XAxis dataKey="year" fontSize={10} interval={0} minTickGap={0} tickLine={false} tickMargin={6} />
                   <YAxis fontSize={10} tickFormatter={(value) => `${Math.round(Number(value) / 1000)}千`} width={34} />
                   <Tooltip
@@ -539,7 +539,7 @@ export default function DashboardPage() {
                     }}
                     labelFormatter={(label) => `${label}年`}
                   />
-                  <Bar dataKey="price" fill="#b42318" maxBarSize={24} name="価格" />
+                  <Bar dataKey="price" fill="#005bac" maxBarSize={24} name="価格" />
                 </BarChart>
               </ResponsiveContainer>
             )}

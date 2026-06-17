@@ -62,8 +62,8 @@ function boundaryStyleForSelection(
 
   if (!hasMarketData) {
     return {
-      color: "#5f6f80",
-      fillColor: "#708090",
+      color: "#5d7087",
+      fillColor: "#768ca5",
       fillOpacity: 0.035,
       opacity: 0.48,
       weight: 0.95
@@ -71,8 +71,8 @@ function boundaryStyleForSelection(
   }
 
   return {
-    color: selected ? "#b42318" : "#175cd3",
-    fillColor: selected ? "#b42318" : "#528bdb",
+    color: selected ? "#c8322a" : "#005bac",
+    fillColor: selected ? "#c8322a" : "#4f91cc",
     fillOpacity: selected ? 0.24 : 0.12,
     opacity: selected ? 1 : 0.95,
     weight: selected ? 3 : 2
