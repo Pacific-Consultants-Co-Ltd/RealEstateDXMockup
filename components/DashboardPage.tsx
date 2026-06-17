@@ -442,13 +442,14 @@ export default function DashboardPage() {
           <div className={`report-masthead${headerScrolled ? " is-scrolled" : ""}`}>
             <img
               className="brand-bar"
-              src={headerScrolled ? "/logo_panasonichomes.png" : "/logo_panasonichomes_tagline.svg"}
+              src="/logo_panasonichomes.png"
               alt="Panasonic Homes"
             />
           </div>
 
           <div className="report-header-grid">
             <div className="labeled-block input-block">
+              <SectionLabel label="査定条件" />
               <div className="report-info-table" aria-label="査定条件">
                 <label className="report-info-row">
                   <span>情報種別</span>
@@ -479,6 +480,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="brand-panel">
+              <SectionLabel label="査定結果" />
               <div className="valuation-strip" aria-label="査定結果">
                 <MetricBox label="単価相場" value={draftUnitPriceLabel} />
                 <MetricBox label="上昇率" value={formatPercent(growthRatePercent)} />
