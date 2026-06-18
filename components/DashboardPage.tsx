@@ -440,11 +440,10 @@ export default function DashboardPage() {
       <section className="report-sheet" aria-label="用地取得査定">
         <header className="report-header">
           <div className={`report-masthead${headerScrolled ? " is-scrolled" : ""}`}>
-            <img
-              className="brand-bar"
-              src="/logo_panasonichomes.png"
-              alt="Panasonic Homes"
-            />
+            <div className="brand-bar" aria-label="まちしるべPRO（仮）">
+              <span>まちしるべPRO</span>
+              <small>（仮）</small>
+            </div>
           </div>
 
           <div className="report-header-grid">

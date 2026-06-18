@@ -261,16 +261,27 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .brand-bar {
-  display: block;
-  height: auto;
-  max-width: 238px;
+  align-items: baseline;
+  color: var(--blue);
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-size: 24px;
+  font-weight: 900;
+  gap: 2px;
+  line-height: 1.1;
+  max-width: 100%;
   min-width: 0;
-  width: 238px;
+  white-space: nowrap;
+}
+
+.brand-bar small {
+  color: #315f89;
+  font-size: 0.72em;
+  font-weight: 800;
 }
 
 .report-masthead.is-scrolled .brand-bar {
-  max-width: 170px;
-  width: 170px;
+  font-size: 20px;
 }
 
 .valuation-strip {
