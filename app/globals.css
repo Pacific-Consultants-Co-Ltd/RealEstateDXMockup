@@ -1,19 +1,19 @@
 :root {
   --paper: #ffffff;
-  --page-bg: #cfdbe8;
+  --page-bg: #bccfe3;
   --ink: #142235;
   --muted: #526276;
-  --line: #9fb2c8;
-  --grid-line: #c1d0df;
+  --line: #9eb4cc;
+  --grid-line: #ccd9e6;
   --header-blue: #102f57;
-  --table-blue: #dbe7f3;
+  --table-blue: #cbdff2;
   --red: #c8322a;
   --blue: #005bac;
   --green: #1f7564;
   --amber: #a46418;
 
   --surface: #ffffff;
-  --surface-muted: #e5edf6;
+  --surface-muted: #dbe8f5;
   --focus-ring: rgba(0, 91, 172, 0.2);
   --shadow-sm: 0 1px 3px rgba(14, 35, 61, 0.1);
   --shadow-md: 0 12px 32px rgba(14, 35, 61, 0.12);
@@ -35,7 +35,7 @@ body {
 
 body {
   background:
-    linear-gradient(180deg, #e7eff8 0, var(--page-bg) 340px),
+    linear-gradient(180deg, #d8e6f4 0, var(--page-bg) 340px),
     var(--page-bg);
   color: var(--ink);
   font-family: "Yu Gothic UI", "Hiragino Sans", "Meiryo", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -88,43 +88,43 @@ input[type="number"]::-webkit-outer-spin-button {
   min-height: 100vh;
   max-width: 100%;
   overflow-x: auto;
-  padding: 18px;
+  padding: 14px;
 }
 
 .report-sheet {
   background: var(--paper);
-  border: 1px solid rgba(159, 178, 200, 0.92);
+  border: 1px solid rgba(141, 166, 194, 0.96);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   margin: 0;
-  min-height: calc(100vh - 36px);
+  min-height: calc(100vh - 28px);
   min-width: min(1080px, 100%);
-  padding: 0 18px 18px;
+  padding: 0 16px 16px;
   width: 100%;
 }
 
 .report-header {
   display: grid;
-  gap: 16px;
-  padding-top: 112px;
+  gap: 14px;
+  padding-top: 74px;
 }
 
 .report-masthead {
   align-items: center;
   background: rgba(255, 255, 255, 0.96);
   border-bottom: 3px solid var(--blue);
-  border-left: 1px solid rgba(159, 178, 200, 0.92);
-  border-right: 1px solid rgba(159, 178, 200, 0.92);
-  border-top: 1px solid rgba(159, 178, 200, 0.92);
+  border-left: 1px solid rgba(141, 166, 194, 0.96);
+  border-right: 1px solid rgba(141, 166, 194, 0.96);
+  border-top: 1px solid rgba(141, 166, 194, 0.96);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   display: flex;
   justify-content: flex-start;
-  left: 18px;
-  min-height: 64px;
-  padding: 18px 18px 10px;
+  left: 14px;
+  min-height: 56px;
+  padding: 12px 16px 7px;
   position: fixed;
-  right: 18px;
-  top: 18px;
+  right: 14px;
+  top: 14px;
   z-index: 20;
 }
 
@@ -135,10 +135,10 @@ input[type="number"]::-webkit-outer-spin-button {
   border-right: 0;
   border-top: 0;
   box-shadow: 0 7px 16px rgba(14, 35, 61, 0.1);
-  left: 18px;
-  min-height: 52px;
-  padding: 12px 18px 8px;
-  right: 18px;
+  left: 14px;
+  min-height: 46px;
+  padding: 9px 16px 7px;
+  right: 14px;
   top: 0;
 }
 
@@ -157,7 +157,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .section-label {
   align-items: center;
-  background: linear-gradient(180deg, #e1ebf6 0%, #d2e0ef 100%);
+  background: #dbe8f5;
   border: 1px solid var(--grid-line);
   border-radius: var(--radius-sm);
   color: #17355b;
@@ -172,8 +172,8 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .section-toolbar {
   align-items: center;
-  background: linear-gradient(180deg, #e1ebf6 0%, #d2e0ef 100%);
-  border-bottom: 1px solid var(--grid-line);
+  background: linear-gradient(180deg, #0c63b4 0%, #084b8d 100%);
+  border-bottom: 1px solid #073f78;
   display: flex;
   gap: 8px;
   justify-content: space-between;
@@ -182,7 +182,9 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .section-toolbar .section-label {
+  background: transparent;
   border: 0;
+  color: #ffffff;
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -214,9 +216,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .report-info-row > span {
   align-items: center;
-  background: #dce8f4;
+  background: #c8dbef;
   border-right: 1px solid var(--grid-line);
-  color: #28445f;
+  color: #17355b;
   display: flex;
   font-weight: 800;
   padding: 0 10px;
@@ -238,7 +240,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .report-info-row select:hover,
 .metric-box input:hover,
 .formula-cell input:hover {
-  background: #edf4fb;
+  background: #eaf3fb;
 }
 
 .report-info-row input:focus,
@@ -261,14 +263,14 @@ input[type="number"]::-webkit-outer-spin-button {
 .brand-bar {
   display: block;
   height: auto;
-  max-width: 268px;
+  max-width: 238px;
   min-width: 0;
-  width: 268px;
+  width: 238px;
 }
 
 .report-masthead.is-scrolled .brand-bar {
-  max-width: 188px;
-  width: 188px;
+  max-width: 170px;
+  width: 170px;
 }
 
 .valuation-strip {
@@ -285,14 +287,25 @@ input[type="number"]::-webkit-outer-spin-button {
   grid-template-rows: 27px minmax(42px, 1fr);
   min-width: 0;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 7px rgba(14, 35, 61, 0.1);
+  position: relative;
+}
+
+.metric-box::before {
+  background: var(--blue);
+  content: "";
+  height: 3px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
 }
 
 .metric-box span {
   align-items: center;
-  background: #dce8f4;
+  background: #c8dbef;
   border-bottom: 1px solid var(--grid-line);
-  color: #28445f;
+  color: #17355b;
   display: flex;
   font-size: 11px;
   font-weight: 800;
@@ -324,6 +337,14 @@ input[type="number"]::-webkit-outer-spin-button {
   font-size: 14px;
 }
 
+.metric-box.strong {
+  border-color: rgba(200, 50, 42, 0.55);
+}
+
+.metric-box.strong::before {
+  background: var(--red);
+}
+
 .report-toggle-button,
 .recalculate-button {
   align-items: center;
@@ -349,7 +370,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .report-toggle-button {
-  background: var(--surface-muted);
+  background: #f4f8fc;
   border-color: var(--line);
   color: var(--header-blue);
   flex: 0 0 auto;
@@ -358,7 +379,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .report-toggle-button:hover {
-  background: #edf4fb;
+  background: #eaf3fb;
   border-color: #7f98b4;
 }
 
@@ -415,10 +436,10 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .mode-notice {
-  background: #e5edf6;
+  background: #dbe8f5;
   border: 1px solid var(--grid-line);
   border-radius: var(--radius-md);
-  color: #28445f;
+  color: #17355b;
   font-size: 11px;
   font-weight: 800;
   margin: 10px 0 0;
@@ -468,7 +489,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .map-frame .leaflet-container {
-  background: #d7e3ef;
+  background: #cadbeb;
   font-family: inherit;
   filter: saturate(0.9) contrast(1.03);
 }
@@ -645,9 +666,11 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .report-chart > .section-label {
+  background: linear-gradient(180deg, #0c63b4 0%, #084b8d 100%);
   border: 0;
   border-bottom: 1px solid var(--grid-line);
   border-radius: 0;
+  color: #ffffff;
   margin: 0 -2px;
 }
 
@@ -663,9 +686,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .history-title {
   align-items: center;
-  background: linear-gradient(180deg, #e1ebf6 0%, #d2e0ef 100%);
-  border-bottom: 1px solid var(--grid-line);
-  color: #28445f;
+  background: linear-gradient(180deg, #0c63b4 0%, #084b8d 100%);
+  border-bottom: 1px solid #073f78;
+  color: #ffffff;
   display: flex;
   font-size: 12px;
   font-weight: 900;
@@ -678,7 +701,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .property-table-wrap {
   min-height: 0;
   overflow: auto;
-  scrollbar-color: #8da6bf transparent;
+  scrollbar-color: #6f8eae transparent;
   scrollbar-width: thin;
 }
 
@@ -694,8 +717,8 @@ input[type="number"]::-webkit-outer-spin-button {
 .history-table-wrap::-webkit-scrollbar-thumb,
 .selected-case-table-wrap::-webkit-scrollbar-thumb,
 .property-table-wrap::-webkit-scrollbar-thumb {
-  background: #8da6bf;
-  border: 2px solid #e5edf6;
+  background: #6f8eae;
+  border: 2px solid #dbe8f5;
   border-radius: 999px;
 }
 
@@ -730,7 +753,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .history-table th,
 .selected-case-table th,
 .property-table th {
-  background: #dbe7f3;
+  background: #cbdff2;
   color: #17355b;
   font-size: 11px;
   font-weight: 900;
@@ -748,14 +771,14 @@ input[type="number"]::-webkit-outer-spin-button {
 .history-table tbody tr:nth-child(even) td,
 .selected-case-table tbody tr:nth-child(even) td,
 .property-table tbody tr:nth-child(even) td {
-  background: #eef5fb;
+  background: #f6f7f9;
 }
 
 .land-table tbody tr:hover td,
 .history-table tbody tr:hover td,
 .selected-case-table tbody tr:hover td,
 .property-table tbody tr:hover td {
-  background: #e5edf6;
+  background: #eef1f5;
 }
 
 .active-row td {
@@ -802,9 +825,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .panel-heading {
   align-items: center;
-  background: linear-gradient(180deg, #e1ebf6 0%, #d2e0ef 100%);
-  border-bottom: 1px solid var(--grid-line);
-  color: #17355b;
+  background: linear-gradient(180deg, #0c63b4 0%, #084b8d 100%);
+  border-bottom: 1px solid #073f78;
+  color: #ffffff;
   display: flex;
   gap: 10px;
   justify-content: space-between;
@@ -820,7 +843,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .panel-heading p {
-  color: var(--muted);
+  color: #d7e8f8;
   font-size: 11px;
   font-weight: 800;
   margin: 2px 0 0;
@@ -836,7 +859,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .formula-row {
   align-items: stretch;
-  background: #edf4fb;
+  background: #eaf3fb;
   display: grid;
   gap: 9px;
   grid-template-columns:
@@ -859,9 +882,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .formula-cell span {
   align-items: center;
-  background: #dce8f4;
+  background: #c8dbef;
   border-bottom: 1px solid var(--grid-line);
-  color: #28445f;
+  color: #17355b;
   display: flex;
   font-size: 11px;
   font-weight: 900;
