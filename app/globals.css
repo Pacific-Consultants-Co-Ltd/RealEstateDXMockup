@@ -927,7 +927,7 @@ input[type="number"]::-webkit-outer-spin-button {
   line-height: 1;
   list-style: none;
   min-height: 30px;
-  min-width: 96px;
+  min-width: 76px;
   padding: 8px 10px;
   user-select: none;
 }
@@ -999,8 +999,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .legend-area-no-data {
-  background: rgba(154, 168, 184, 0.12);
-  border: 2px dashed #9aa8b8;
+  background: rgba(118, 140, 165, 0.06);
+  border: 1px solid rgba(93, 112, 135, 0.48);
 }
 
 .legend-target,

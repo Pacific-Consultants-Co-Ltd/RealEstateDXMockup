@@ -96,8 +96,6 @@ const OSAKA_MAP_BOUNDS: LatLngBoundsExpression = [
 ];
 const MAP_TOOLTIP_PANE = "map-tooltip-pane";
 const SELECTION_ACCENT = "#006f7d";
-const GSI_PALE_TILE_ATTRIBUTION =
-  '出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院</a>';
 const GSI_PALE_TILE_URL = "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png";
 
 const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[] = [
@@ -476,7 +474,13 @@ function TargetViewport({ target }: { target: TargetLocation }) {
   return null;
 }
 
-function MapLegend() {
+function MapLegend({
+  layerFilter,
+  markerMode
+}: {
+  layerFilter: BoundaryLayerFilter;
+  markerMode: MapMarkerMode;
+}) {
   return (
     <details
       aria-label="地図凡例"
@@ -496,32 +500,41 @@ function MapLegend() {
         </span>
         <span className="map-legend-item">
           <i className="legend-symbol legend-area-selected" aria-hidden="true" />
-          選択中
+          選択エリア
         </span>
-        <span className="map-legend-item">
-          <i className="legend-symbol legend-area-no-data" aria-hidden="true" />
-          データなし
-        </span>
+        {layerFilter === "all" ? (
+          <span className="map-legend-item">
+            <i className="legend-symbol legend-area-no-data" aria-hidden="true" />
+            データなし
+          </span>
+        ) : null}
         <span className="map-legend-item">
           <i className="legend-symbol legend-target" aria-hidden="true" />
           査定地
         </span>
-        <span className="map-legend-item">
-          <i className="legend-symbol legend-case" aria-hidden="true" />
-          事例
-        </span>
-        <span className="map-legend-item">
-          <i className="legend-symbol legend-case-selected" aria-hidden="true" />
-          選択事例
-        </span>
-        <span className="map-legend-item">
-          <i className="legend-symbol legend-land-price" aria-hidden="true" />
-          公示地価
-        </span>
-        <span className="map-legend-item">
-          <i className="legend-symbol legend-land-price-selected" aria-hidden="true" />
-          選択地価
-        </span>
+        {markerMode === "cases" ? (
+          <>
+            <span className="map-legend-item">
+              <i className="legend-symbol legend-case" aria-hidden="true" />
+              事例
+            </span>
+            <span className="map-legend-item">
+              <i className="legend-symbol legend-case-selected" aria-hidden="true" />
+              選択事例
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="map-legend-item">
+              <i className="legend-symbol legend-land-price" aria-hidden="true" />
+              公示地価
+            </span>
+            <span className="map-legend-item">
+              <i className="legend-symbol legend-land-price-selected" aria-hidden="true" />
+              選択地価
+            </span>
+          </>
+        )}
       </div>
     </details>
   );
@@ -661,14 +674,16 @@ function MapContextPanel({
 
 function MapControls({
   layerFilter,
+  markerMode,
   onLayerFilterChange
 }: {
   layerFilter: BoundaryLayerFilter;
+  markerMode: MapMarkerMode;
   onLayerFilterChange: (value: BoundaryLayerFilter) => void;
 }) {
   return (
     <div className="map-legend-overlay">
-      <MapLegend />
+      <MapLegend layerFilter={layerFilter} markerMode={markerMode} />
       <MapLayerFilter value={layerFilter} onChange={onLayerFilterChange} />
     </div>
   );
@@ -898,13 +913,14 @@ export default function MapView({
           minZoom={9}
           scrollWheelZoom
           zoom={13}
+          attributionControl={false}
           zoomControl={false}
         >
           <BoundaryViewport onBboxChange={handleBboxChange} />
           <TargetPlacementEvents active={targetPlacementActive} onPickTarget={onPickTarget} />
           <TargetViewport target={target} />
           <ZoomControl position="bottomright" />
-          <TileLayer attribution={GSI_PALE_TILE_ATTRIBUTION} url={GSI_PALE_TILE_URL} />
+          <TileLayer url={GSI_PALE_TILE_URL} />
           <Pane name={MAP_TOOLTIP_PANE} style={{ zIndex: 760, pointerEvents: "none" }} />
           <Pane name="boundary-pane" style={{ zIndex: 410 }}>
             {visibleBoundaryData ? (
@@ -1006,7 +1022,11 @@ export default function MapView({
           target={target}
           visibleMarkerCount={visiblePrimaryMarkerCount}
         />
-        <MapControls layerFilter={boundaryLayerFilter} onLayerFilterChange={handleBoundaryLayerFilterChange} />
+        <MapControls
+          layerFilter={boundaryLayerFilter}
+          markerMode={markerMode}
+          onLayerFilterChange={handleBoundaryLayerFilterChange}
+        />
         {boundaryError ? <div className="map-boundary-status">境界データを読み込めませんでした</div> : null}
       </div>
     </section>

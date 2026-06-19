@@ -99,13 +99,8 @@ function currentTarget(address: string): TargetLocation {
   };
 }
 
-function withDefaultSelection(items: ComparableCase[]): ComparableCase[] {
-  if (items.some((item) => item.selected)) {
-    return items;
-  }
-
-  const selectedIds = new Set(items.slice(0, 4).map((item) => item.id));
-  return items.map((item) => (selectedIds.has(item.id) ? { ...item, selected: true } : item));
+function clearCaseSelection(items: ComparableCase[]): ComparableCase[] {
+  return items.map((item) => ({ ...item, selected: false }));
 }
 
 function buildAreaOptions(items: AreaSourceItem[]): MapArea[] {
@@ -295,17 +290,14 @@ export default function DashboardPage() {
         requestJson<LandPriceResponse>("/api/reinfolib/land-price-points")
       ]);
 
-      const nextCsvCases = withDefaultSelection(csv.cases ?? []);
-      const nextTransactionCases = withDefaultSelection(transactions.cases ?? []);
+      const nextCsvCases = clearCaseSelection(csv.cases ?? []);
+      const nextTransactionCases = clearCaseSelection(transactions.cases ?? []);
       const nextCases = [...nextCsvCases, ...nextTransactionCases];
       const nextLandPricePoints = landPrices.points ?? [];
-      const initialLandPointIds = latestLandPoints(nextLandPricePoints)
-        .slice(0, 1)
-        .map((point) => point.pointId);
 
       setCases(nextCases);
       setLandPricePoints(nextLandPricePoints);
-      setSelectedLandPointIds(initialLandPointIds);
+      setSelectedLandPointIds([]);
       setWarnings(mergeWarnings(csv.warnings, [transactions.warning], [landPrices.warning]));
     } catch (error) {
       setWarnings([error instanceof Error ? error.message : "初期データ取得に失敗しました。"]);

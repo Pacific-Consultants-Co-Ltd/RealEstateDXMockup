@@ -52,7 +52,7 @@ The Reinfolib routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLI
 
 1. Initial load shows the Osaka / Moriguchi / Miyakojima area.
 2. The 11-row CSV is loaded into the map and table.
-3. Four CSV rows are preselected.
+3. No comparable cases or public land-price points are selected by default.
 4. Click table checkboxes or map pins to select/unselect comparable cases.
 5. Switch `情報種別` to `公示地価`, then click public land-price pins or table checkboxes to choose the land-price points used for the growth rate.
 6. Click administrative map areas to filter the visible pins/table for the current `情報種別`.
