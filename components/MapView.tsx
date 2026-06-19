@@ -93,6 +93,7 @@ const OSAKA_MAP_BOUNDS: LatLngBoundsExpression = [
   [35.051394, 135.746794]
 ];
 const MAP_TOOLTIP_PANE = "map-tooltip-pane";
+const SELECTION_ACCENT = "#006f7d";
 
 const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[] = [
   { value: "all", label: "すべて" },
@@ -127,8 +128,8 @@ const targetMarkerStyle: PathOptions = {
 
 const selectedCaseMarkerStyle: PathOptions = {
   className: "map-marker map-marker-case is-selected",
-  color: "#c8322a",
-  fillColor: "#c8322a",
+  color: SELECTION_ACCENT,
+  fillColor: SELECTION_ACCENT,
   fillOpacity: 0.88,
   opacity: 1,
   weight: 3
@@ -145,7 +146,7 @@ const caseMarkerStyle: PathOptions = {
 
 const selectedLandMarkerStyle: PathOptions = {
   className: "map-marker map-marker-land is-selected",
-  color: "#c8322a",
+  color: SELECTION_ACCENT,
   fillColor: "#1f7564",
   fillOpacity: 0.9,
   opacity: 1,
@@ -204,8 +205,8 @@ function boundaryStyleForSelection(
   }
 
   return {
-    color: selected ? "#c8322a" : "#005bac",
-    fillColor: selected ? "#c8322a" : "#4f91cc",
+    color: selected ? SELECTION_ACCENT : "#005bac",
+    fillColor: selected ? SELECTION_ACCENT : "#4f91cc",
     fillOpacity: selected ? 0.24 : 0.12,
     opacity: selected ? 1 : 0.95,
     weight: selected ? 3 : 2

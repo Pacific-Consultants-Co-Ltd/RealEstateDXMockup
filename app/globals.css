@@ -7,8 +7,10 @@
   --grid-line: #ccd9e6;
   --header-blue: #102f57;
   --table-blue: #cbdff2;
-  --red: #c8322a;
   --blue: #005bac;
+  --accent: #006f7d;
+  --accent-rgb: 0, 111, 125;
+  --accent-soft: #e8f7f8;
   --green: #1f7564;
   --amber: #a46418;
 
@@ -70,7 +72,7 @@ button {
 }
 
 input[type="checkbox"] {
-  accent-color: var(--red);
+  accent-color: var(--accent);
 }
 
 input[type="number"] {
@@ -344,16 +346,16 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .metric-box.strong strong {
-  color: var(--red);
+  color: var(--accent);
   font-size: 14px;
 }
 
 .metric-box.strong {
-  border-color: rgba(200, 50, 42, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.55);
 }
 
 .metric-box.strong::before {
-  background: var(--red);
+  background: var(--accent);
 }
 
 .report-toggle-button {
@@ -635,7 +637,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .map-frame .leaflet-overlay-pane path.map-marker.is-selected {
-  filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0.9)) drop-shadow(0 4px 7px rgba(200, 50, 42, 0.32));
+  filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0.9)) drop-shadow(0 4px 7px rgba(var(--accent-rgb), 0.28));
 }
 
 .map-context-card {
@@ -795,9 +797,9 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .map-boundary-status {
   background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(200, 50, 42, 0.36);
+  border: 1px solid #f5d48a;
   border-radius: var(--radius-md);
-  color: var(--red);
+  color: #8a4d0b;
   font-size: 10px;
   font-weight: 800;
   line-height: 1.25;
@@ -895,8 +897,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .legend-area-selected {
-  background: rgba(200, 50, 42, 0.16);
-  border: 2px solid var(--red);
+  background: rgba(var(--accent-rgb), 0.16);
+  border: 2px solid var(--accent);
 }
 
 .legend-area-no-data {
@@ -925,8 +927,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .legend-case-selected {
-  background: var(--red);
-  border: 3px solid var(--red);
+  background: var(--accent);
+  border: 3px solid var(--accent);
 }
 
 .legend-land-price {
@@ -936,7 +938,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .legend-land-price-selected {
   background: var(--green);
-  border: 3px solid var(--red);
+  border: 3px solid var(--accent);
 }
 
 .map-frame .map-point-tooltip {
@@ -982,7 +984,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .map-frame .map-point-tooltip small {
-  color: var(--red);
+  color: var(--accent);
   font-size: 10px;
   font-weight: 900;
 }
@@ -1158,11 +1160,11 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .active-row td {
-  background: #fff5f3 !important;
+  background: var(--accent-soft) !important;
 }
 
 .active-row td:first-child {
-  box-shadow: inset 3px 0 0 var(--red);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .land-table strong,
@@ -1286,7 +1288,7 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .formula-cell.strong strong,
 .formula-cell.accent strong {
-  color: var(--red);
+  color: var(--accent);
 }
 
 .formula-cell.input-cell input {
