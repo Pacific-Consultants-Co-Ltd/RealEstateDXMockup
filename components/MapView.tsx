@@ -27,6 +27,7 @@ export interface MapArea {
 }
 
 export interface CaseMapMarker {
+  areaKey: string;
   id: string;
   label: string;
   subtitle: string;
@@ -35,9 +36,11 @@ export interface CaseMapMarker {
   latitude: number;
   longitude: number;
   selected: boolean;
+  snapToAreaCentroid: boolean;
 }
 
 export interface LandPriceMapMarker {
+  areaKey: string;
   pointId: string;
   label: string;
   subtitle: string;
@@ -46,6 +49,7 @@ export interface LandPriceMapMarker {
   latitude: number;
   longitude: number;
   selected: boolean;
+  snapToAreaCentroid: boolean;
 }
 
 export type MapMarkerMode = "cases" | "land-price";
@@ -63,10 +67,14 @@ interface MapViewProps {
 }
 
 type BoundaryProperties = {
+  areaBaseKey?: string;
+  areaBaseLabel?: string;
   areaKey?: string;
   areaLabel?: string;
   CITY_NAME?: string;
   S_NAME?: string;
+  X_CODE?: number | string;
+  Y_CODE?: number | string;
 };
 
 type BoundaryFeature = Feature<Geometry, BoundaryProperties>;
@@ -83,6 +91,23 @@ const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[
   { value: "all", label: "すべて" },
   { value: "market-data", label: "市場データのみ" }
 ];
+
+interface MapCoordinate {
+  latitude: number;
+  longitude: number;
+}
+
+interface BoundarySpatialIndexItem {
+  centroid: MapCoordinate;
+  geometry: Geometry;
+}
+
+type SnappableMarker = {
+  areaKey: string;
+  latitude: number;
+  longitude: number;
+  snapToAreaCentroid: boolean;
+};
 
 const targetMarkerStyle: PathOptions = {
   className: "map-marker map-marker-target",
@@ -133,8 +158,23 @@ function stopMapClick(event: LeafletMouseEvent) {
   L.DomEvent.stopPropagation(event.originalEvent);
 }
 
+function selectableFeatureAreaKey(feature: BoundaryFeature | undefined, availableAreaSet: ReadonlySet<string>): string {
+  const areaKey = feature?.properties?.areaKey ?? "";
+  const areaBaseKey = feature?.properties?.areaBaseKey ?? "";
+
+  if (areaKey && availableAreaSet.has(areaKey)) {
+    return areaKey;
+  }
+
+  if (areaBaseKey && availableAreaSet.has(areaBaseKey)) {
+    return areaBaseKey;
+  }
+
+  return "";
+}
+
 function featureHasMarketData(feature: BoundaryFeature, availableAreaSet: ReadonlySet<string>) {
-  return availableAreaSet.has(feature.properties?.areaKey ?? "");
+  return Boolean(selectableFeatureAreaKey(feature, availableAreaSet));
 }
 
 function boundaryStyleForSelection(
@@ -142,9 +182,9 @@ function boundaryStyleForSelection(
   selectedAreaSet: ReadonlySet<string>,
   availableAreaSet: ReadonlySet<string>
 ): PathOptions {
-  const areaKey = feature?.properties?.areaKey ?? "";
-  const selected = selectedAreaSet.has(areaKey);
-  const hasMarketData = availableAreaSet.has(areaKey);
+  const selectableAreaKey = selectableFeatureAreaKey(feature, availableAreaSet);
+  const selected = selectedAreaSet.has(selectableAreaKey);
+  const hasMarketData = Boolean(selectableAreaKey);
 
   if (!hasMarketData) {
     return {
@@ -174,6 +214,191 @@ function boundsToBbox(bounds: L.LatLngBounds): string {
   const north = bounds.getNorth() + latPadding;
 
   return [west, south, east, north].map((value) => value.toFixed(6)).join(",");
+}
+
+function ringCentroid(ring: number[][]): { area: number; latitude: number; longitude: number } | undefined {
+  if (ring.length < 3) {
+    return undefined;
+  }
+
+  let twiceArea = 0;
+  let longitudeSum = 0;
+  let latitudeSum = 0;
+
+  for (let index = 0; index < ring.length; index += 1) {
+    const current = ring[index];
+    const next = ring[(index + 1) % ring.length];
+    const cross = current[0] * next[1] - next[0] * current[1];
+
+    twiceArea += cross;
+    longitudeSum += (current[0] + next[0]) * cross;
+    latitudeSum += (current[1] + next[1]) * cross;
+  }
+
+  if (Math.abs(twiceArea) < 1e-12) {
+    const totals = ring.reduce(
+      (sum, coordinate) => ({
+        latitude: sum.latitude + coordinate[1],
+        longitude: sum.longitude + coordinate[0]
+      }),
+      { latitude: 0, longitude: 0 }
+    );
+
+    return {
+      area: 0,
+      latitude: totals.latitude / ring.length,
+      longitude: totals.longitude / ring.length
+    };
+  }
+
+  return {
+    area: twiceArea / 2,
+    latitude: latitudeSum / (3 * twiceArea),
+    longitude: longitudeSum / (3 * twiceArea)
+  };
+}
+
+function polygonCentroid(polygon: number[][][]): { area: number; centroid: MapCoordinate } | undefined {
+  const outerRing = polygon[0];
+  const centroid = outerRing ? ringCentroid(outerRing) : undefined;
+
+  if (!centroid) {
+    return undefined;
+  }
+
+  return {
+    area: Math.abs(centroid.area),
+    centroid: {
+      latitude: centroid.latitude,
+      longitude: centroid.longitude
+    }
+  };
+}
+
+function geometryCentroid(geometry: Geometry): MapCoordinate | undefined {
+  if (geometry.type === "Polygon") {
+    return polygonCentroid(geometry.coordinates)?.centroid;
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    const largestPolygon = geometry.coordinates
+      .map(polygonCentroid)
+      .filter((item): item is { area: number; centroid: MapCoordinate } => Boolean(item))
+      .sort((left, right) => right.area - left.area)[0];
+
+    return largestPolygon?.centroid;
+  }
+
+  if (geometry.type === "Point") {
+    const [longitude, latitude] = geometry.coordinates;
+    return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : undefined;
+  }
+
+  return undefined;
+}
+
+function propertiesCentroid(properties: BoundaryProperties): MapCoordinate | undefined {
+  const longitude = Number(properties.X_CODE);
+  const latitude = Number(properties.Y_CODE);
+
+  return Number.isFinite(latitude) && Number.isFinite(longitude) ? { latitude, longitude } : undefined;
+}
+
+function pointInRing(point: MapCoordinate, ring: number[][]): boolean {
+  let inside = false;
+  let previousIndex = ring.length - 1;
+
+  for (let index = 0; index < ring.length; index += 1) {
+    const current = ring[index];
+    const previous = ring[previousIndex];
+    const currentLongitude = current[0];
+    const currentLatitude = current[1];
+    const previousLongitude = previous[0];
+    const previousLatitude = previous[1];
+    const intersects =
+      currentLatitude > point.latitude !== previousLatitude > point.latitude &&
+      point.longitude <
+        ((previousLongitude - currentLongitude) * (point.latitude - currentLatitude)) /
+          (previousLatitude - currentLatitude) +
+          currentLongitude;
+
+    if (intersects) {
+      inside = !inside;
+    }
+
+    previousIndex = index;
+  }
+
+  return inside;
+}
+
+function pointInPolygon(point: MapCoordinate, polygon: number[][][]): boolean {
+  const [outerRing, ...holes] = polygon;
+
+  if (!outerRing || !pointInRing(point, outerRing)) {
+    return false;
+  }
+
+  return !holes.some((hole) => pointInRing(point, hole));
+}
+
+function pointInGeometry(point: MapCoordinate, geometry: Geometry): boolean {
+  if (geometry.type === "Polygon") {
+    return pointInPolygon(point, geometry.coordinates);
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.some((polygon) => pointInPolygon(point, polygon));
+  }
+
+  return false;
+}
+
+function coordinateDistanceSquared(left: MapCoordinate, right: MapCoordinate): number {
+  const latitudeDistance = left.latitude - right.latitude;
+  const longitudeDistance = left.longitude - right.longitude;
+  return latitudeDistance * latitudeDistance + longitudeDistance * longitudeDistance;
+}
+
+function snapMarkerToBoundary(
+  marker: SnappableMarker,
+  boundaryIndex: ReadonlyMap<string, BoundarySpatialIndexItem[]>
+): MapCoordinate {
+  const original = { latitude: marker.latitude, longitude: marker.longitude };
+  const boundaries = marker.snapToAreaCentroid ? boundaryIndex.get(marker.areaKey) ?? [] : [];
+
+  if (boundaries.length === 0) {
+    return original;
+  }
+
+  const containingBoundary = boundaries.find((boundary) => pointInGeometry(original, boundary.geometry));
+
+  if (containingBoundary) {
+    return original;
+  }
+
+  const boundary = boundaries.reduce((nearest, current) =>
+    coordinateDistanceSquared(current.centroid, original) < coordinateDistanceSquared(nearest.centroid, original) ? current : nearest
+  );
+
+  if (pointInGeometry(original, boundary.geometry)) {
+    return original;
+  }
+
+  const snapScales = [0.2, 0.14, 0.08, 0.03, 0];
+
+  for (const scale of snapScales) {
+    const candidate = {
+      latitude: boundary.centroid.latitude + (original.latitude - boundary.centroid.latitude) * scale,
+      longitude: boundary.centroid.longitude + (original.longitude - boundary.centroid.longitude) * scale
+    };
+
+    if (scale === 0 || pointInGeometry(candidate, boundary.geometry)) {
+      return candidate;
+    }
+  }
+
+  return boundary.centroid;
 }
 
 function BoundaryViewport({ onBboxChange }: { onBboxChange: (bbox: string) => void }) {
@@ -411,11 +636,16 @@ export default function MapView({
 
   const areaByKey = useMemo(() => new Map(areas.map((area) => [area.key, area])), [areas]);
   const availableAreaSet = useMemo(() => new Set(areas.map((area) => area.key)), [areas]);
+  const requestedBoundaryKeys = useMemo(() => Array.from(availableAreaSet).sort((left, right) => left.localeCompare(right, "ja")), [
+    availableAreaSet
+  ]);
   const selectedAreaSet = useMemo(() => new Set(selectedAreaKeys), [selectedAreaKeys]);
   const availableAreaSetRef = useRef(availableAreaSet);
   const selectedAreaSetRef = useRef(selectedAreaSet);
-  const boundaryLayerKey = useMemo(() => `boundaries-${boundaryBbox}-${boundaryLayerFilter}`, [
+  const boundaryKeySignature = requestedBoundaryKeys.join(",");
+  const boundaryLayerKey = useMemo(() => `boundaries-${boundaryBbox}-${boundaryLayerFilter}-${boundaryKeySignature}`, [
     boundaryBbox,
+    boundaryKeySignature,
     boundaryLayerFilter
   ]);
   const visibleBoundaryData = useMemo(() => {
@@ -428,8 +658,45 @@ export default function MapView({
       features: boundaryData.features.filter((feature) => featureHasMarketData(feature, availableAreaSet))
     };
   }, [availableAreaSet, boundaryData, boundaryLayerFilter]);
+  const boundarySpatialIndex = useMemo(() => {
+    const index = new Map<string, BoundarySpatialIndexItem[]>();
+
+    for (const feature of boundaryData?.features ?? []) {
+      const areaKey = feature.properties?.areaKey;
+      const areaBaseKey = feature.properties?.areaBaseKey;
+      const centroid = geometryCentroid(feature.geometry) ?? propertiesCentroid(feature.properties);
+
+      if (!centroid) {
+        continue;
+      }
+
+      const item = {
+        centroid,
+        geometry: feature.geometry
+      };
+
+      for (const key of new Set([areaKey, areaBaseKey].filter((value): value is string => Boolean(value)))) {
+        const items = index.get(key);
+        if (items) {
+          items.push(item);
+        } else {
+          index.set(key, [item]);
+        }
+      }
+    }
+
+    return index;
+  }, [boundaryData]);
   const activeCaseMarkers = markerMode === "cases" ? caseMarkers : [];
-  const activeLandPriceMarkers = landPriceMarkers;
+  const activeLandPriceMarkers = markerMode === "land-price" ? landPriceMarkers : [];
+  const renderableCaseMarkers = useMemo(
+    () => activeCaseMarkers.filter((marker) => !marker.snapToAreaCentroid || boundarySpatialIndex.has(marker.areaKey)),
+    [activeCaseMarkers, boundarySpatialIndex]
+  );
+  const renderableLandPriceMarkers = useMemo(
+    () => activeLandPriceMarkers.filter((marker) => !marker.snapToAreaCentroid || boundarySpatialIndex.has(marker.areaKey)),
+    [activeLandPriceMarkers, boundarySpatialIndex]
+  );
   const handleBboxChange = useCallback((bbox: string) => {
     setBoundaryBbox((current) => (current === bbox ? current : bbox));
   }, []);
@@ -443,11 +710,11 @@ export default function MapView({
     [availableAreaSet, selectedAreaSet]
   );
   const primaryMarkerLabel = markerMode === "cases" ? "事例" : "地価地点";
-  const visiblePrimaryMarkerCount = markerMode === "cases" ? activeCaseMarkers.length : activeLandPriceMarkers.length;
+  const visiblePrimaryMarkerCount = markerMode === "cases" ? renderableCaseMarkers.length : renderableLandPriceMarkers.length;
   const selectedPrimaryMarkerCount =
     markerMode === "cases"
-      ? activeCaseMarkers.filter((marker) => marker.selected).length
-      : activeLandPriceMarkers.filter((marker) => marker.selected).length;
+      ? renderableCaseMarkers.filter((marker) => marker.selected).length
+      : renderableLandPriceMarkers.filter((marker) => marker.selected).length;
 
   useEffect(() => {
     availableAreaSetRef.current = availableAreaSet;
@@ -455,7 +722,7 @@ export default function MapView({
   }, [availableAreaSet, selectedAreaSet]);
 
   useEffect(() => {
-    if (!boundaryBbox) {
+    if (!boundaryBbox && requestedBoundaryKeys.length === 0) {
       setBoundaryData(null);
       setBoundaryError(false);
       return;
@@ -466,7 +733,13 @@ export default function MapView({
     async function loadBoundaries() {
       try {
         const params = new URLSearchParams();
-        params.set("bbox", boundaryBbox);
+        if (boundaryBbox) {
+          params.set("bbox", boundaryBbox);
+        }
+
+        for (const key of requestedBoundaryKeys) {
+          params.append("key", key);
+        }
 
         const response = await fetch(`/api/boundaries/osaka?${params.toString()}`, {
           cache: "force-cache",
@@ -491,7 +764,7 @@ export default function MapView({
     void loadBoundaries();
 
     return () => controller.abort();
-  }, [boundaryBbox]);
+  }, [boundaryBbox, requestedBoundaryKeys]);
 
   useEffect(() => {
     boundaryLayerRef.current?.eachLayer((layer) => {
@@ -504,7 +777,7 @@ export default function MapView({
   }, [boundaryStyle, visibleBoundaryData]);
 
   function onEachBoundaryFeature(feature: BoundaryFeature, layer: L.Layer) {
-    const areaKey = feature.properties?.areaKey;
+    const areaKey = selectableFeatureAreaKey(feature, availableAreaSet);
 
     if (!areaKey) {
       return;
@@ -515,7 +788,7 @@ export default function MapView({
       return;
     }
 
-    const label = area.label ?? feature.properties?.areaLabel ?? areaKey;
+    const label = area.label ?? feature.properties?.areaBaseLabel ?? feature.properties?.areaLabel ?? areaKey;
     const countLabel = ` (${area.count})`;
     layer.bindTooltip(`${label}${countLabel}`, { direction: "top", pane: MAP_TOOLTIP_PANE, sticky: true });
     layer.on({
@@ -576,54 +849,62 @@ export default function MapView({
                 <span>{target.address}</span>
               </Tooltip>
             </CircleMarker>
-            {activeCaseMarkers.map((marker) => (
-              <CircleMarker
-                center={[marker.latitude, marker.longitude]}
-                eventHandlers={{
-                  click: (event) => {
-                    stopMapClick(event);
-                    onToggleCase(marker.id);
-                  },
-                  mousemove: closeBoundaryTooltips,
-                  mouseover: closeBoundaryTooltips
-                }}
-                key={marker.id}
-                pathOptions={marker.selected ? selectedCaseMarkerStyle : caseMarkerStyle}
-                radius={marker.selected ? 8 : 6}
-              >
-                <MarkerTooltip
-                  detailLabel={marker.detailLabel}
-                  selected={marker.selected}
-                  subtitle={marker.subtitle}
-                  title={marker.label}
-                  valueLabel={marker.valueLabel}
-                />
-              </CircleMarker>
-            ))}
-            {activeLandPriceMarkers.map((marker) => (
-              <CircleMarker
-                center={[marker.latitude, marker.longitude]}
-                eventHandlers={{
-                  click: (event) => {
-                    stopMapClick(event);
-                    onToggleLandPoint(marker.pointId);
-                  },
-                  mousemove: closeBoundaryTooltips,
-                  mouseover: closeBoundaryTooltips
-                }}
-                key={marker.pointId}
-                pathOptions={marker.selected ? selectedLandMarkerStyle : landMarkerStyle}
-                radius={marker.selected ? 8 : 6}
-              >
-                <MarkerTooltip
-                  detailLabel={marker.detailLabel}
-                  selected={marker.selected}
-                  subtitle={marker.subtitle}
-                  title={marker.label}
-                  valueLabel={marker.valueLabel}
-                />
-              </CircleMarker>
-            ))}
+            {renderableCaseMarkers.map((marker) => {
+              const position = snapMarkerToBoundary(marker, boundarySpatialIndex);
+
+              return (
+                <CircleMarker
+                  center={[position.latitude, position.longitude]}
+                  eventHandlers={{
+                    click: (event) => {
+                      stopMapClick(event);
+                      onToggleCase(marker.id);
+                    },
+                    mousemove: closeBoundaryTooltips,
+                    mouseover: closeBoundaryTooltips
+                  }}
+                  key={marker.id}
+                  pathOptions={marker.selected ? selectedCaseMarkerStyle : caseMarkerStyle}
+                  radius={marker.selected ? 8 : 6}
+                >
+                  <MarkerTooltip
+                    detailLabel={marker.detailLabel}
+                    selected={marker.selected}
+                    subtitle={marker.subtitle}
+                    title={marker.label}
+                    valueLabel={marker.valueLabel}
+                  />
+                </CircleMarker>
+              );
+            })}
+            {renderableLandPriceMarkers.map((marker) => {
+              const position = snapMarkerToBoundary(marker, boundarySpatialIndex);
+
+              return (
+                <CircleMarker
+                  center={[position.latitude, position.longitude]}
+                  eventHandlers={{
+                    click: (event) => {
+                      stopMapClick(event);
+                      onToggleLandPoint(marker.pointId);
+                    },
+                    mousemove: closeBoundaryTooltips,
+                    mouseover: closeBoundaryTooltips
+                  }}
+                  key={marker.pointId}
+                  pathOptions={marker.selected ? selectedLandMarkerStyle : landMarkerStyle}
+                  radius={marker.selected ? 8 : 6}
+                >
+                  <MarkerTooltip
+                    detailLabel={marker.detailLabel}
+                    selected={marker.selected}
+                    subtitle={marker.subtitle}
+                    title={marker.label}
+                    valueLabel={marker.valueLabel}
+                  />
+                </CircleMarker>
+              );
+            })}
           </Pane>
         </MapContainer>
         <MapContextPanel

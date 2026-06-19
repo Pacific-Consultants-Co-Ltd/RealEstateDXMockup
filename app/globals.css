@@ -400,6 +400,48 @@ input[type="number"]::-webkit-outer-spin-button {
   white-space: nowrap;
 }
 
+.selection-actions {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.selection-count {
+  color: #d7e8f8;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.selection-action-button {
+  align-items: center;
+  background: #f4f8fc;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--header-blue);
+  display: inline-flex;
+  flex: 0 0 26px;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
+  width: 26px;
+}
+
+.selection-action-button:hover:not(:disabled),
+.selection-action-button:focus-visible {
+  background: #eaf3fb;
+  border-color: #7f98b4;
+  color: var(--blue);
+  outline: none;
+}
+
+.selection-action-button svg {
+  flex: 0 0 auto;
+}
+
 .fallback-banner {
   align-items: flex-start;
   background: #fff8e8;
@@ -1284,7 +1326,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .selected-case-table {
-  min-width: 920px;
+  min-width: 980px;
 }
 
 .selected-case-table thead th {
@@ -1294,11 +1336,16 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .selected-case-table td:nth-child(1) {
+  text-align: center;
+  width: 46px;
+}
+
+.selected-case-table td:nth-child(2) {
   font-weight: 900;
   width: 126px;
 }
 
-.selected-case-table td:nth-child(2) {
+.selected-case-table td:nth-child(3) {
   min-width: 220px;
 }
 

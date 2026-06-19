@@ -52,8 +52,8 @@ Both routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLIB_API_KEY
 2. The 11-row CSV is loaded into the map and table.
 3. Four CSV rows are preselected.
 4. Click table checkboxes or map pins to select/unselect comparable cases.
-5. Click public land-price pins or table checkboxes to choose the land-price points used for the growth rate.
-6. Click administrative map areas to filter the visible case/pin list by district.
+5. Switch `情報種別` to `公示地価`, then click public land-price pins or table checkboxes to choose the land-price points used for the growth rate.
+6. Click administrative map areas to filter the visible pins/table for the current `情報種別`.
 7. The average 坪単価, 上昇率, 査定金額, and 入札額 update automatically when selections, 用地坪数, or 補正係数 change.
 
 ## How To Use The Dashboard
@@ -65,12 +65,12 @@ Both routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLIB_API_KEY
 2. Confirm or edit `所在地`; this moves the valuation target marker on the map.
 3. Enter `敷地面積` in tsubo.
 4. Use the `エリア` map.
-   - Click a colored administrative area to limit visible rows and pins to that area.
+   - Click a colored administrative area to limit visible rows and pins for the current `情報種別`.
    - Use `全物件表示` / `全地点表示` to return to all visible data.
    - Use the map display menu to show all administrative boundaries or only areas with market data.
 5. Select data for calculation.
    - In case modes, click a map case pin or the table checkbox to include/exclude that comparable case.
-   - Click a public land-price pin or the public land-price table checkbox to include/exclude that point. Switching `情報種別` to `公示地価` focuses the map on those points.
+   - In `公示地価` mode, click a public land-price pin or the public land-price table checkbox to include/exclude that point.
 6. Review `地価推移` and the public land-price history table. These reflect the selected public land-price points.
 7. Set `補正係数` in the calculation row when the bid should be adjusted above or below the appraisal amount.
 8. Read the result boxes.

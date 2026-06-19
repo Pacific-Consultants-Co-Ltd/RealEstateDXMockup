@@ -1,14 +1,20 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, SquareCheck, SquareX } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 
 import ErrorFallbackBanner from "@/components/ErrorFallbackBanner";
 import LoadingState from "@/components/LoadingState";
 import type { CaseMapMarker, LandPriceMapMarker, MapArea, MapMarkerMode } from "@/components/MapView";
-import { areaKeyFromAddress, areaLabelFromAddress, normalizeAddress } from "@/lib/areaKeys";
+import {
+  areaBaseKeyFromAddress,
+  areaBaseLabelFromAddress,
+  areaKeyFromAddress,
+  areaLabelFromAddress,
+  normalizeAddress
+} from "@/lib/areaKeys";
 import {
   formatM2,
   formatPercent,
@@ -53,6 +59,8 @@ interface HistoryRow {
 
 interface AreaSourceItem {
   address: string;
+  areaKey?: string;
+  areaLabel?: string;
   latitude: number;
   longitude: number;
 }
@@ -101,8 +109,8 @@ function buildAreaOptions(items: AreaSourceItem[]): MapArea[] {
       continue;
     }
 
-    const key = areaKeyFromAddress(item.address);
-    const label = areaLabelFromAddress(item.address);
+    const key = item.areaKey ?? areaKeyFromAddress(item.address);
+    const label = item.areaLabel ?? areaLabelFromAddress(item.address);
     const current = grouped.get(key);
     if (current) {
       current.latitude += item.latitude;
@@ -122,6 +130,14 @@ function buildAreaOptions(items: AreaSourceItem[]): MapArea[] {
       count: value.count
     }))
     .sort((left, right) => left.label.localeCompare(right.label, "ja"));
+}
+
+function areaKeyForInformationType(address: string, informationType: InformationType): string {
+  return informationType === "公示地価" ? areaKeyFromAddress(address) : areaBaseKeyFromAddress(address);
+}
+
+function areaLabelForInformationType(address: string, informationType: InformationType): string {
+  return informationType === "公示地価" ? areaLabelFromAddress(address) : areaBaseLabelFromAddress(address);
 }
 
 function caseSourceMatchesInformationType(comparable: ComparableCase, informationType: InformationType): boolean {
@@ -318,10 +334,12 @@ export default function DashboardPage() {
       return;
     }
 
-    setShowAllProperties(false);
-    setSelectedAreaKeys((current) =>
-      current.includes(areaKey) ? current.filter((key) => key !== areaKey) : [...current, areaKey]
-    );
+    setSelectedAreaKeys((current) => {
+      const next = current.includes(areaKey) ? current.filter((key) => key !== areaKey) : [...current, areaKey];
+      setShowAllProperties(next.length === 0);
+
+      return next;
+    });
   }
 
   const target = useMemo(() => currentTarget(address), [address]);
@@ -330,8 +348,15 @@ export default function DashboardPage() {
     () => cases.filter((item) => caseSourceMatchesInformationType(item, informationType)),
     [cases, informationType]
   );
-  const areaSourceItems = useMemo(
-    () => (informationType === "公示地価" ? latestPoints : [...activeCases, ...latestPoints]),
+  const areaSourceItems = useMemo<AreaSourceItem[]>(
+    () =>
+      (informationType === "公示地価" ? latestPoints : activeCases).map((item) => ({
+        address: item.address,
+        areaKey: areaKeyForInformationType(item.address, informationType),
+        areaLabel: areaLabelForInformationType(item.address, informationType),
+        latitude: item.latitude,
+        longitude: item.longitude
+      })),
     [activeCases, informationType, latestPoints]
   );
   const areaOptions = useMemo(
@@ -345,17 +370,21 @@ export default function DashboardPage() {
       isCaseInformationType(informationType)
         ? showAllProperties
           ? activeCases
-          : activeCases.filter((item) => selectedAreaKeys.includes(areaKeyFromAddress(item.address)))
+          : activeCases.filter((item) => selectedAreaKeys.includes(areaKeyForInformationType(item.address, informationType)))
         : [],
     [activeCases, informationType, selectedAreaKeys, showAllProperties]
   );
   const selectedVisibleCases = useMemo(() => visibleCases.filter((item) => item.selected), [visibleCases]);
+  const focusedCaseRows = useMemo(
+    () => (selectedAreaKeys.length > 0 ? visibleCases : selectedVisibleCases),
+    [selectedAreaKeys.length, selectedVisibleCases, visibleCases]
+  );
   const visibleLatestPoints = useMemo(
     () =>
-      !showAllProperties
+      informationType === "公示地価" && !showAllProperties
         ? latestPoints.filter((point) => selectedAreaKeys.includes(areaKeyFromAddress(point.address)))
         : latestPoints,
-    [latestPoints, selectedAreaKeys, showAllProperties]
+    [informationType, latestPoints, selectedAreaKeys, showAllProperties]
   );
   const visibleSelectedLandPointIds = useMemo(
     () => new Set(visibleLatestPoints.filter((point) => selectedLandPointIds.includes(point.pointId)).map((point) => point.pointId)),
@@ -381,19 +410,24 @@ export default function DashboardPage() {
   const allItemsLabel = informationType === "公示地価" ? "全地点表示" : "全物件表示";
   const hideAllItemsLabel = informationType === "公示地価" ? "全地点非表示" : "全物件非表示";
   const mapMarkerMode: MapMarkerMode = informationType === "公示地価" ? "land-price" : "cases";
+  const selectionItemLabel = informationType === "公示地価" ? "地点" : "事例";
+  const activeSelectableCount = isCaseInformationType(informationType) ? visibleCases.length : visibleLatestPoints.length;
+  const activeSelectedCount = isCaseInformationType(informationType) ? selectedVisibleCases.length : selectedLandPointCount;
   const caseMapMarkers = useMemo<CaseMapMarker[]>(
     () =>
       visibleCases
         .filter((comparable) => Number.isFinite(comparable.latitude) && Number.isFinite(comparable.longitude))
         .map((comparable) => ({
+          areaKey: areaBaseKeyFromAddress(comparable.address),
           id: comparable.id,
-          label: areaLabelFromAddress(comparable.address),
+          label: areaBaseLabelFromAddress(comparable.address),
           subtitle: compactAddress(comparable.address),
           valueLabel: comparable.priceTotalDisplay || formatYen(comparable.priceTotalYen),
           detailLabel: formatYenPerTsubo(comparable.unitPricePerTsubo),
           latitude: comparable.latitude,
           longitude: comparable.longitude,
-          selected: comparable.selected
+          selected: comparable.selected,
+          snapToAreaCentroid: true
         })),
     [visibleCases]
   );
@@ -402,6 +436,7 @@ export default function DashboardPage() {
       visibleLatestPoints
         .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude))
         .map((point) => ({
+          areaKey: areaKeyFromAddress(point.address),
           pointId: point.pointId,
           label: point.standardLotNumber || point.pointId,
           subtitle: [point.nearestStation, point.distanceToStation].filter(Boolean).join(" ") || compactAddress(point.address),
@@ -409,13 +444,37 @@ export default function DashboardPage() {
           detailLabel: formatPercent(point.yearOnYearChangeRate),
           latitude: point.latitude,
           longitude: point.longitude,
-          selected: visibleSelectedLandPointIds.has(point.pointId)
+          selected: visibleSelectedLandPointIds.has(point.pointId),
+          snapToAreaCentroid: point.raw.fallback === true
         })),
     [visibleLatestPoints, visibleSelectedLandPointIds]
   );
   const draftUnitPriceLabel = selectedVisibleCases.length > 0 ? formatYenPerTsubo(valuation.averageTsuboUnitPrice) : "-";
   const appraisalAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.appraisalAmount) : "-";
   const bidAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-";
+
+  function handleSelectAllVisibleItems() {
+    if (isCaseInformationType(informationType)) {
+      const visibleIds = new Set(visibleCases.map((item) => item.id));
+      setCases((current) => current.map((item) => (visibleIds.has(item.id) ? { ...item, selected: true } : item)));
+      return;
+    }
+
+    setSelectedLandPointIds((current) =>
+      Array.from(new Set([...current, ...visibleLatestPoints.map((point) => point.pointId)]))
+    );
+  }
+
+  function handleClearVisibleSelection() {
+    if (isCaseInformationType(informationType)) {
+      const visibleIds = new Set(visibleCases.map((item) => item.id));
+      setCases((current) => current.map((item) => (visibleIds.has(item.id) ? { ...item, selected: false } : item)));
+      return;
+    }
+
+    const visiblePointIds = new Set(visibleLatestPoints.map((point) => point.pointId));
+    setSelectedLandPointIds((current) => current.filter((pointId) => !visiblePointIds.has(pointId)));
+  }
 
   return (
     <main className="report-app">
@@ -478,6 +537,13 @@ export default function DashboardPage() {
           <div className="report-map">
             <div className="section-toolbar">
               <SectionLabel label="エリア" />
+              <SelectionActionButtons
+                itemLabel={selectionItemLabel}
+                selectedCount={activeSelectedCount}
+                totalCount={activeSelectableCount}
+                onClearSelection={handleClearVisibleSelection}
+                onSelectAll={handleSelectAllVisibleItems}
+              />
               <VisibilityToggleButton
                 allItemsLabel={allItemsLabel}
                 hideAllItemsLabel={hideAllItemsLabel}
@@ -556,7 +622,12 @@ export default function DashboardPage() {
 
         {isCaseInformationType(informationType) ? (
           <>
-            <SelectedCaseTable cases={selectedVisibleCases} informationType={informationType} />
+            <SelectedCaseTable
+              calculationTargetCount={selectedVisibleCases.length}
+              cases={focusedCaseRows}
+              informationType={informationType}
+              onToggleCase={handleToggleCase}
+            />
             <PropertyTable
               cases={visibleCases}
               informationType={informationType}
@@ -613,6 +684,51 @@ function VisibilityToggleButton({
         {allItemsLabel}
       </span>
     </button>
+  );
+}
+
+function SelectionActionButtons({
+  itemLabel,
+  selectedCount,
+  totalCount,
+  onClearSelection,
+  onSelectAll
+}: {
+  itemLabel: string;
+  selectedCount: number;
+  totalCount: number;
+  onClearSelection: () => void;
+  onSelectAll: () => void;
+}) {
+  const selectAllLabel = `表示中の${itemLabel}を全選択`;
+  const clearSelectionLabel = `表示中の選択${itemLabel}を解除`;
+
+  return (
+    <div className="selection-actions" aria-label="選択操作">
+      <span className="selection-count">
+        選択 {selectedCount.toLocaleString("ja-JP")}/{totalCount.toLocaleString("ja-JP")}
+      </span>
+      <button
+        aria-label={selectAllLabel}
+        className="selection-action-button"
+        disabled={totalCount === 0 || selectedCount === totalCount}
+        title={selectAllLabel}
+        type="button"
+        onClick={onSelectAll}
+      >
+        <SquareCheck aria-hidden="true" size={14} strokeWidth={2.5} />
+      </button>
+      <button
+        aria-label={clearSelectionLabel}
+        className="selection-action-button"
+        disabled={selectedCount === 0}
+        title={clearSelectionLabel}
+        type="button"
+        onClick={onClearSelection}
+      >
+        <SquareX aria-hidden="true" size={14} strokeWidth={2.5} />
+      </button>
+    </div>
   );
 }
 
@@ -765,17 +881,30 @@ function LandPointTable({
   );
 }
 
-function SelectedCaseTable({ cases, informationType }: { cases: ComparableCase[]; informationType: InformationType }) {
+function SelectedCaseTable({
+  calculationTargetCount,
+  cases,
+  informationType,
+  onToggleCase
+}: {
+  calculationTargetCount: number;
+  cases: ComparableCase[];
+  informationType: InformationType;
+  onToggleCase: (id: string) => void;
+}) {
   return (
     <section className="selected-case-panel">
       <div className="panel-heading compact selected-case-heading">
         <h2>選択中の{informationType}</h2>
-        <p className="property-count">計算対象 {cases.length}件</p>
+        <p className="property-count">
+          表示 {cases.length}件 / 計算対象 {calculationTargetCount}件
+        </p>
       </div>
       <div className="selected-case-table-wrap">
         <table className="selected-case-table">
           <thead>
             <tr>
+              <th>計算</th>
               <th>町丁目</th>
               <th>所在地</th>
               <th>土地</th>
@@ -787,11 +916,19 @@ function SelectedCaseTable({ cases, informationType }: { cases: ComparableCase[]
           <tbody>
             {cases.length === 0 ? (
               <tr>
-                <td colSpan={6}>選択なし</td>
+                <td colSpan={7}>選択なし</td>
               </tr>
             ) : null}
             {cases.map((comparable) => (
-              <tr key={comparable.id}>
+              <tr className={comparable.selected ? "active-row" : ""} key={comparable.id}>
+                <td>
+                  <input
+                    aria-label={`${comparable.address}を計算対象にする`}
+                    checked={comparable.selected}
+                    type="checkbox"
+                    onChange={() => onToggleCase(comparable.id)}
+                  />
+                </td>
                 <td>{areaLabelFromAddress(comparable.address)}</td>
                 <td>{compactAddress(comparable.address)}</td>
                 <td>

@@ -3,7 +3,7 @@ import path from "path";
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { areaKeyFromBoundary, normalizeAreaKey } from "@/lib/areaKeys";
+import { areaBaseKeyFromBoundary, areaKeyFromBoundary, normalizeAreaBaseLabel, normalizeAreaKey } from "@/lib/areaKeys";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +80,10 @@ export async function GET(request: NextRequest) {
     const sName = typeof feature.properties.S_NAME === "string" ? feature.properties.S_NAME : "";
     const areaKey = areaKeyFromBoundary(cityName, sName);
     const townOnlyKey = normalizeAreaKey(sName);
-    const matchesRequestedKey = requestedKeys.has(areaKey) || requestedKeys.has(townOnlyKey);
+    const areaBaseKey = areaBaseKeyFromBoundary(cityName, sName);
+    const townBaseKey = normalizeAreaBaseLabel(sName);
+    const requestedKeyCandidates = [areaKey, townOnlyKey, areaBaseKey, townBaseKey].filter(Boolean);
+    const matchesRequestedKey = requestedKeyCandidates.some((key) => requestedKeys.has(key));
     const matchesViewport = bbox ? featureMatchesBbox(feature, bbox) : false;
 
     if (!areaKey || (!matchesRequestedKey && !matchesViewport)) {
@@ -92,7 +95,9 @@ export async function GET(request: NextRequest) {
       properties: {
         ...feature.properties,
         areaKey,
-        areaLabel: townOnlyKey
+        areaLabel: townOnlyKey,
+        areaBaseKey,
+        areaBaseLabel: townBaseKey
       }
     });
   }

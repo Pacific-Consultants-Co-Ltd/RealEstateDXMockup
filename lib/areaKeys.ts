@@ -54,6 +54,10 @@ export function normalizeAreaKey(value: string): string {
   });
 }
 
+export function normalizeAreaBaseLabel(value: string): string {
+  return normalizeAreaKey(value).replace(/[0-9]+丁目$/, "");
+}
+
 export function normalizeMunicipality(value: string): string {
   return normalizeAddress(value).replace(/\|/g, "");
 }
@@ -81,14 +85,30 @@ export function areaLabelFromAddress(address: string): string {
   return normalizeAreaKey(chome?.[1] || town.slice(0, 10) || address);
 }
 
+export function areaBaseLabelFromAddress(address: string): string {
+  return normalizeAreaBaseLabel(areaLabelFromAddress(address));
+}
+
 export function areaKeyFromAddress(address: string): string {
   const { municipality } = splitOsakaAddress(address);
   const label = areaLabelFromAddress(address);
   return municipality ? `${municipality}|${label}` : label;
 }
 
+export function areaBaseKeyFromAddress(address: string): string {
+  const { municipality } = splitOsakaAddress(address);
+  const label = areaBaseLabelFromAddress(address);
+  return municipality ? `${municipality}|${label}` : label;
+}
+
 export function areaKeyFromBoundary(cityName: string, sName: string): string {
   const municipality = normalizeMunicipality(cityName);
   const label = normalizeAreaKey(sName);
+  return municipality && label ? `${municipality}|${label}` : label;
+}
+
+export function areaBaseKeyFromBoundary(cityName: string, sName: string): string {
+  const municipality = normalizeMunicipality(cityName);
+  const label = normalizeAreaBaseLabel(sName);
   return municipality && label ? `${municipality}|${label}` : label;
 }
