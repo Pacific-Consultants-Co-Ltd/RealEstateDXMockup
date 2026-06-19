@@ -1,9 +1,19 @@
 "use client";
 
 import L, { type LatLngBoundsExpression, type LeafletMouseEvent, type PathOptions } from "leaflet";
+import { Layers, ListChecks, MapPin } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
-import { CircleMarker, GeoJSON as GeoJSONLayer, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import {
+  CircleMarker,
+  GeoJSON as GeoJSONLayer,
+  MapContainer,
+  TileLayer,
+  Tooltip,
+  useMap,
+  useMapEvents,
+  ZoomControl
+} from "react-leaflet";
 
 import type { TargetLocation } from "@/lib/types";
 
@@ -73,6 +83,7 @@ const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[
 ];
 
 const targetMarkerStyle: PathOptions = {
+  className: "map-marker map-marker-target",
   color: "#142235",
   fillColor: "#ffffff",
   fillOpacity: 0.95,
@@ -81,6 +92,7 @@ const targetMarkerStyle: PathOptions = {
 };
 
 const selectedCaseMarkerStyle: PathOptions = {
+  className: "map-marker map-marker-case is-selected",
   color: "#c8322a",
   fillColor: "#c8322a",
   fillOpacity: 0.88,
@@ -89,6 +101,7 @@ const selectedCaseMarkerStyle: PathOptions = {
 };
 
 const caseMarkerStyle: PathOptions = {
+  className: "map-marker map-marker-case",
   color: "#005bac",
   fillColor: "#ffffff",
   fillOpacity: 0.92,
@@ -97,6 +110,7 @@ const caseMarkerStyle: PathOptions = {
 };
 
 const selectedLandMarkerStyle: PathOptions = {
+  className: "map-marker map-marker-land is-selected",
   color: "#c8322a",
   fillColor: "#1f7564",
   fillOpacity: 0.9,
@@ -105,6 +119,7 @@ const selectedLandMarkerStyle: PathOptions = {
 };
 
 const landMarkerStyle: PathOptions = {
+  className: "map-marker map-marker-land",
   color: "#1f7564",
   fillColor: "#ffffff",
   fillOpacity: 0.95,
@@ -196,8 +211,9 @@ function MapLegend() {
       onDoubleClick={(event) => event.stopPropagation()}
     >
       <summary>
+        <ListChecks aria-hidden="true" className="map-control-icon" size={14} strokeWidth={2.6} />
+        <span>凡例</span>
         <span className="legend-toggle-icon" aria-hidden="true" />
-        凡例
       </summary>
       <div className="map-legend-grid">
         <span className="map-legend-item">
@@ -278,8 +294,9 @@ function MapLayerFilter({
       onDoubleClick={(event) => event.stopPropagation()}
     >
       <summary>
+        <Layers aria-hidden="true" className="map-control-icon" size={14} strokeWidth={2.6} />
+        <span>表示</span>
         <span className="legend-toggle-icon" aria-hidden="true" />
-        表示
       </summary>
       <div className="map-layer-filter-body">
         <div className="map-layer-segmented" role="group" aria-label="表示する境界">
@@ -297,6 +314,59 @@ function MapLayerFilter({
         </div>
       </div>
     </details>
+  );
+}
+
+function MapContextPanel({
+  areaCount,
+  primaryMarkerLabel,
+  selectedAreaCount,
+  selectedMarkerCount,
+  target,
+  visibleMarkerCount
+}: {
+  areaCount: number;
+  primaryMarkerLabel: string;
+  selectedAreaCount: number;
+  selectedMarkerCount: number;
+  target: TargetLocation;
+  visibleMarkerCount: number;
+}) {
+  return (
+    <div
+      aria-label="地図表示状況"
+      className="map-context-card"
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
+      <div className="map-context-heading">
+        <span className="map-context-pin" aria-hidden="true">
+          <MapPin size={15} strokeWidth={2.7} />
+        </span>
+        <div>
+          <span>査定地</span>
+          <strong>{target.address}</strong>
+        </div>
+      </div>
+      <dl className="map-context-stats">
+        <div>
+          <dt>{primaryMarkerLabel}</dt>
+          <dd>{visibleMarkerCount.toLocaleString("ja-JP")}</dd>
+        </div>
+        <div>
+          <dt>選択</dt>
+          <dd>{selectedMarkerCount.toLocaleString("ja-JP")}</dd>
+        </div>
+        <div>
+          <dt>エリア</dt>
+          <dd>
+            {selectedAreaCount > 0
+              ? `${selectedAreaCount.toLocaleString("ja-JP")}/${areaCount.toLocaleString("ja-JP")}`
+              : areaCount.toLocaleString("ja-JP")}
+          </dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
@@ -360,6 +430,12 @@ export default function MapView({
     (feature?: BoundaryFeature) => boundaryStyleForSelection(feature, selectedAreaSet, availableAreaSet),
     [availableAreaSet, selectedAreaSet]
   );
+  const primaryMarkerLabel = markerMode === "cases" ? "事例" : "地価地点";
+  const visiblePrimaryMarkerCount = markerMode === "cases" ? activeCaseMarkers.length : activeLandPriceMarkers.length;
+  const selectedPrimaryMarkerCount =
+    markerMode === "cases"
+      ? activeCaseMarkers.filter((marker) => marker.selected).length
+      : activeLandPriceMarkers.filter((marker) => marker.selected).length;
 
   useEffect(() => {
     availableAreaSetRef.current = availableAreaSet;
@@ -463,9 +539,11 @@ export default function MapView({
           minZoom={9}
           scrollWheelZoom
           zoom={13}
+          zoomControl={false}
         >
           <BoundaryViewport onBboxChange={handleBboxChange} />
           <TargetViewport target={target} />
+          <ZoomControl position="bottomright" />
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {visibleBoundaryData ? (
             <GeoJSONLayer
@@ -527,6 +605,14 @@ export default function MapView({
             </CircleMarker>
           ))}
         </MapContainer>
+        <MapContextPanel
+          areaCount={areas.length}
+          primaryMarkerLabel={primaryMarkerLabel}
+          selectedAreaCount={selectedAreaKeys.length}
+          selectedMarkerCount={selectedPrimaryMarkerCount}
+          target={target}
+          visibleMarkerCount={visiblePrimaryMarkerCount}
+        />
         <MapControls layerFilter={boundaryLayerFilter} onLayerFilterChange={setBoundaryLayerFilter} />
         {boundaryError ? <div className="map-boundary-status">境界データを読み込めませんでした</div> : null}
       </div>
