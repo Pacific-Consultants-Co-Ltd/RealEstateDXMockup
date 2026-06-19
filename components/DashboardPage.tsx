@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { MapPin, MapPinOff, SquareCheck, SquareX } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorFallbackBanner from "@/components/ErrorFallbackBanner";
 import LoadingState from "@/components/LoadingState";
@@ -744,10 +744,8 @@ export default function DashboardPage() {
           onAdjustmentPercentChange={(value) => {
             setAdjustmentPercent(value);
           }}
-        />
-
-        {isCaseInformationType(informationType) ? (
-          <>
+        >
+          {isCaseInformationType(informationType) ? (
             <SelectedCaseTable
               areaFilterActive={hasSelectedAreas}
               calculationTargetCount={selectedVisibleCases.length}
@@ -756,6 +754,11 @@ export default function DashboardPage() {
               onSetCaseSelection={handleSetCaseSelection}
               onToggleCase={handleToggleCase}
             />
+          ) : null}
+        </CalculationFlow>
+
+        {isCaseInformationType(informationType) ? (
+          <>
             <PropertyTable
               cases={visibleCases}
               informationType={informationType}
@@ -894,6 +897,7 @@ function SelectionActionButtons({
 
 function CalculationFlow({
   adjustmentPercent,
+  children,
   growthRatePercent,
   landTsubo,
   selectedCaseCount,
@@ -902,6 +906,7 @@ function CalculationFlow({
   onAdjustmentPercentChange
 }: {
   adjustmentPercent: number;
+  children?: ReactNode;
   growthRatePercent: number;
   landTsubo: number;
   selectedCaseCount: number;
@@ -942,6 +947,7 @@ function CalculationFlow({
         <Operator value="=" />
         <FormulaValue label="入札額" value={valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-"} accent />
       </div>
+      {children}
     </section>
   );
 }

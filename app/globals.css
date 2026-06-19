@@ -1330,7 +1330,6 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .calculation-panel,
-.selected-case-panel,
 .property-panel {
   margin-top: 18px;
 }
@@ -1494,7 +1493,6 @@ input[type="number"]::-webkit-outer-spin-button {
 
 }
 
-.selected-case-panel,
 .property-panel {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1505,6 +1503,18 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .selected-case-heading {
   align-items: flex-start;
+  background: #dbe8f5;
+  border-bottom: 1px solid var(--grid-line);
+  border-top: 1px solid var(--line);
+  color: #17355b;
+}
+
+.selected-case-heading p {
+  color: var(--muted);
+}
+
+.selected-case-panel {
+  background: var(--surface);
 }
 
 .selected-case-table-wrap {
