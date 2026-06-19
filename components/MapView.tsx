@@ -8,6 +8,7 @@ import {
   CircleMarker,
   GeoJSON as GeoJSONLayer,
   MapContainer,
+  Pane,
   TileLayer,
   Tooltip,
   useMap,
@@ -76,6 +77,7 @@ const OSAKA_MAP_BOUNDS: LatLngBoundsExpression = [
   [34.271799, 135.091699],
   [35.051394, 135.746794]
 ];
+const MAP_TOOLTIP_PANE = "map-tooltip-pane";
 
 const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[] = [
   { value: "all", label: "すべて" },
@@ -267,7 +269,7 @@ function MarkerTooltip({
   valueLabel: string;
 }) {
   return (
-    <Tooltip className="map-point-tooltip" direction="top" offset={[0, -6]}>
+    <Tooltip className="map-point-tooltip" direction="top" offset={[0, -6]} pane={MAP_TOOLTIP_PANE}>
       <strong>{title}</strong>
       <span>{subtitle}</span>
       <em>
@@ -431,6 +433,11 @@ export default function MapView({
   const handleBboxChange = useCallback((bbox: string) => {
     setBoundaryBbox((current) => (current === bbox ? current : bbox));
   }, []);
+  const closeBoundaryTooltips = useCallback(() => {
+    boundaryLayerRef.current?.eachLayer((layer) => {
+      layer.closeTooltip();
+    });
+  }, []);
   const boundaryStyle = useCallback(
     (feature?: BoundaryFeature) => boundaryStyleForSelection(feature, selectedAreaSet, availableAreaSet),
     [availableAreaSet, selectedAreaSet]
@@ -510,7 +517,7 @@ export default function MapView({
 
     const label = area.label ?? feature.properties?.areaLabel ?? areaKey;
     const countLabel = ` (${area.count})`;
-    layer.bindTooltip(`${label}${countLabel}`, { direction: "top", sticky: true });
+    layer.bindTooltip(`${label}${countLabel}`, { direction: "top", pane: MAP_TOOLTIP_PANE, sticky: true });
     layer.on({
       click: (event: LeafletMouseEvent) => {
         stopMapClick(event);
@@ -550,65 +557,74 @@ export default function MapView({
           <TargetViewport target={target} />
           <ZoomControl position="bottomright" />
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {visibleBoundaryData ? (
-            <GeoJSONLayer
-              data={visibleBoundaryData}
-              key={boundaryLayerKey}
-              ref={boundaryLayerRef}
-              onEachFeature={onEachBoundaryFeature}
-              style={boundaryStyle}
-            />
-          ) : null}
-          <CircleMarker center={[target.latitude, target.longitude]} pathOptions={targetMarkerStyle} radius={7}>
-            <Tooltip className="map-point-tooltip" direction="top" offset={[0, -6]}>
-              <strong>査定地</strong>
-              <span>{target.address}</span>
-            </Tooltip>
-          </CircleMarker>
-          {activeCaseMarkers.map((marker) => (
-            <CircleMarker
-              center={[marker.latitude, marker.longitude]}
-              eventHandlers={{
-                click: (event) => {
-                  stopMapClick(event);
-                  onToggleCase(marker.id);
-                }
-              }}
-              key={marker.id}
-              pathOptions={marker.selected ? selectedCaseMarkerStyle : caseMarkerStyle}
-              radius={marker.selected ? 8 : 6}
-            >
-              <MarkerTooltip
-                detailLabel={marker.detailLabel}
-                selected={marker.selected}
-                subtitle={marker.subtitle}
-                title={marker.label}
-                valueLabel={marker.valueLabel}
+          <Pane name={MAP_TOOLTIP_PANE} style={{ zIndex: 760, pointerEvents: "none" }} />
+          <Pane name="boundary-pane" style={{ zIndex: 410 }}>
+            {visibleBoundaryData ? (
+              <GeoJSONLayer
+                data={visibleBoundaryData}
+                key={boundaryLayerKey}
+                ref={boundaryLayerRef}
+                onEachFeature={onEachBoundaryFeature}
+                style={boundaryStyle}
               />
+            ) : null}
+          </Pane>
+          <Pane name="point-pane" style={{ zIndex: 430 }}>
+            <CircleMarker center={[target.latitude, target.longitude]} pathOptions={targetMarkerStyle} radius={7}>
+              <Tooltip className="map-point-tooltip" direction="top" offset={[0, -6]} pane={MAP_TOOLTIP_PANE}>
+                <strong>査定地</strong>
+                <span>{target.address}</span>
+              </Tooltip>
             </CircleMarker>
-          ))}
-          {activeLandPriceMarkers.map((marker) => (
-            <CircleMarker
-              center={[marker.latitude, marker.longitude]}
-              eventHandlers={{
-                click: (event) => {
-                  stopMapClick(event);
-                  onToggleLandPoint(marker.pointId);
-                }
-              }}
-              key={marker.pointId}
-              pathOptions={marker.selected ? selectedLandMarkerStyle : landMarkerStyle}
-              radius={marker.selected ? 8 : 6}
-            >
-              <MarkerTooltip
-                detailLabel={marker.detailLabel}
-                selected={marker.selected}
-                subtitle={marker.subtitle}
-                title={marker.label}
-                valueLabel={marker.valueLabel}
-              />
-            </CircleMarker>
-          ))}
+            {activeCaseMarkers.map((marker) => (
+              <CircleMarker
+                center={[marker.latitude, marker.longitude]}
+                eventHandlers={{
+                  click: (event) => {
+                    stopMapClick(event);
+                    onToggleCase(marker.id);
+                  },
+                  mousemove: closeBoundaryTooltips,
+                  mouseover: closeBoundaryTooltips
+                }}
+                key={marker.id}
+                pathOptions={marker.selected ? selectedCaseMarkerStyle : caseMarkerStyle}
+                radius={marker.selected ? 8 : 6}
+              >
+                <MarkerTooltip
+                  detailLabel={marker.detailLabel}
+                  selected={marker.selected}
+                  subtitle={marker.subtitle}
+                  title={marker.label}
+                  valueLabel={marker.valueLabel}
+                />
+              </CircleMarker>
+            ))}
+            {activeLandPriceMarkers.map((marker) => (
+              <CircleMarker
+                center={[marker.latitude, marker.longitude]}
+                eventHandlers={{
+                  click: (event) => {
+                    stopMapClick(event);
+                    onToggleLandPoint(marker.pointId);
+                  },
+                  mousemove: closeBoundaryTooltips,
+                  mouseover: closeBoundaryTooltips
+                }}
+                key={marker.pointId}
+                pathOptions={marker.selected ? selectedLandMarkerStyle : landMarkerStyle}
+                radius={marker.selected ? 8 : 6}
+              >
+                <MarkerTooltip
+                  detailLabel={marker.detailLabel}
+                  selected={marker.selected}
+                  subtitle={marker.subtitle}
+                  title={marker.label}
+                  valueLabel={marker.valueLabel}
+                />
+              </CircleMarker>
+            ))}
+          </Pane>
         </MapContainer>
         <MapContextPanel
           areaCount={areas.length}
