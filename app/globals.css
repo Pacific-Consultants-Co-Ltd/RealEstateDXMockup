@@ -127,7 +127,7 @@ input[type="number"]::-webkit-outer-spin-button {
   position: fixed;
   right: 14px;
   top: 14px;
-  z-index: 20;
+  z-index: 1200;
 }
 
 .report-masthead.is-scrolled {
@@ -569,8 +569,10 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .map-frame {
   background: #d7e4f1;
+  isolation: isolate;
   overflow: hidden;
   position: relative;
+  z-index: 0;
 }
 
 .map-frame::after {
