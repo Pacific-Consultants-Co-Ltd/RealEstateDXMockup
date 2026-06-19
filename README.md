@@ -44,7 +44,9 @@ The CSV is decoded as CP932 / Shift-JIS on the server, normalized into `Comparab
 
 `/api/reinfolib/land-price-points` proxies XPT002 public land-price point data.
 
-Both routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLIB_API_KEY`. If the key is missing or the request fails, the UI falls back to mock transaction/public land-price data and shows a warning banner.
+`/api/geocode/reverse` reverse-geocodes a clicked map location for the valuation target address, with coordinate fallback when an address cannot be resolved.
+
+The Reinfolib routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLIB_API_KEY`. If the key is missing or the request fails, the UI falls back to mock transaction/public land-price data and shows a warning banner.
 
 ## Demo Flow
 
@@ -54,7 +56,8 @@ Both routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLIB_API_KEY
 4. Click table checkboxes or map pins to select/unselect comparable cases.
 5. Switch `情報種別` to `公示地価`, then click public land-price pins or table checkboxes to choose the land-price points used for the growth rate.
 6. Click administrative map areas to filter the visible pins/table for the current `情報種別`.
-7. The average 坪単価, 上昇率, 査定金額, and 入札額 update automatically when selections, 用地坪数, or 補正係数 change.
+7. Use `査定地指定` to place the valuation target pin directly on the map and update `所在地`.
+8. The average 坪単価, 上昇率, 査定金額, and 入札額 update automatically when selections, 用地坪数, or 補正係数 change.
 
 ## How To Use The Dashboard
 
@@ -63,7 +66,7 @@ Both routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLIB_API_KEY
    - `全事例` shows Real Estate Information Library transaction data and the preloaded CSV data together.
    - `成約事例` and `自社データ` show the preloaded CSV data.
    - `公示地価` focuses the map/table on public land-price point selection.
-2. Confirm or edit `所在地`; this moves the valuation target marker on the map.
+2. Confirm or edit `所在地`, or use `査定地指定` on the map to place the target pin and update `所在地`.
 3. Enter `敷地面積` in tsubo.
 4. Use the `エリア` map.
    - Click a colored administrative area to limit visible rows and pins for the current `情報種別`.

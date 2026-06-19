@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Eye, EyeOff, SquareCheck, SquareX } from "lucide-react";
+import { Eye, EyeOff, MapPin, SquareCheck, SquareX } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorFallbackBanner from "@/components/ErrorFallbackBanner";
 import LoadingState from "@/components/LoadingState";
-import type { CaseMapMarker, LandPriceMapMarker, MapArea, MapMarkerMode } from "@/components/MapView";
+import type { CaseMapMarker, LandPriceMapMarker, MapArea, MapMarkerMode, TargetPickLocation } from "@/components/MapView";
 import {
   areaBaseKeyFromAddress,
   areaBaseLabelFromAddress,
@@ -49,6 +49,13 @@ interface LandPriceResponse {
   points: PublicLandPricePoint[];
   warning?: string;
   fallback?: boolean;
+}
+
+interface ReverseGeocodeResponse {
+  address: string;
+  latitude: number;
+  longitude: number;
+  warning?: string;
 }
 
 interface HistoryRow {
@@ -254,9 +261,17 @@ function formatMultiplier(growthRatePercent: number): string {
   return `${formatPercent(growthRatePercent)} / ${(1 + growthRatePercent / 100).toFixed(3)}倍`;
 }
 
+function coordinateAddress({ latitude, longitude }: TargetPickLocation): string {
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
 export default function DashboardPage() {
   const [informationType, setInformationType] = useState<InformationType>("取引事例");
   const [address, setAddress] = useState(targetLocation.address);
+  const [targetOverride, setTargetOverride] = useState<TargetLocation | undefined>();
+  const [targetPlacementActive, setTargetPlacementActive] = useState(false);
+  const [targetLookupWarning, setTargetLookupWarning] = useState<string | undefined>();
+  const [targetLookupInProgress, setTargetLookupInProgress] = useState(false);
   const [landTsubo, setLandTsubo] = useState(100);
   const [adjustmentPercent, setAdjustmentPercent] = useState(0);
   const [showAllProperties, setShowAllProperties] = useState(true);
@@ -318,6 +333,46 @@ export default function DashboardPage() {
     setSelectedAreaKeys([]);
   }
 
+  function handleAddressChange(nextAddress: string) {
+    setAddress(nextAddress);
+    setTargetOverride(undefined);
+    setTargetLookupWarning(undefined);
+  }
+
+  async function handlePickTarget(location: TargetPickLocation) {
+    const fallbackAddress = coordinateAddress(location);
+    setTargetPlacementActive(false);
+    setTargetLookupInProgress(true);
+    setTargetLookupWarning(undefined);
+    setAddress(fallbackAddress);
+    setTargetOverride({
+      address: fallbackAddress,
+      latitude: location.latitude,
+      longitude: location.longitude
+    });
+
+    try {
+      const params = new URLSearchParams({
+        lat: String(location.latitude),
+        lng: String(location.longitude)
+      });
+      const payload = await requestJson<ReverseGeocodeResponse>(`/api/geocode/reverse?${params.toString()}`);
+      const nextAddress = payload.address || fallbackAddress;
+
+      setAddress(nextAddress);
+      setTargetOverride({
+        address: nextAddress,
+        latitude: location.latitude,
+        longitude: location.longitude
+      });
+      setTargetLookupWarning(payload.warning);
+    } catch (error) {
+      setTargetLookupWarning(error instanceof Error ? error.message : "住所を取得できなかったため、座標を表示しています。");
+    } finally {
+      setTargetLookupInProgress(false);
+    }
+  }
+
   function handleToggleCase(id: string) {
     setCases((current) => current.map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
   }
@@ -331,6 +386,17 @@ export default function DashboardPage() {
     setSelectedLandPointIds((current) =>
       current.includes(pointId) ? current.filter((id) => id !== pointId) : [...current, pointId]
     );
+  }
+
+  function handleSetLandPointSelection(pointIds: string[], selected: boolean) {
+    const targetPointIds = new Set(pointIds);
+    setSelectedLandPointIds((current) => {
+      if (selected) {
+        return Array.from(new Set([...current, ...targetPointIds]));
+      }
+
+      return current.filter((pointId) => !targetPointIds.has(pointId));
+    });
   }
 
   function handleToggleAllProperties() {
@@ -351,7 +417,10 @@ export default function DashboardPage() {
     });
   }
 
-  const target = useMemo(() => currentTarget(address), [address]);
+  const target = useMemo(
+    () => (targetOverride && targetOverride.address === address ? targetOverride : currentTarget(address)),
+    [address, targetOverride]
+  );
   const latestPoints = useMemo(() => latestLandPoints(landPricePoints), [landPricePoints]);
   const activeCases = useMemo(
     () => cases.filter((item) => caseSourceMatchesInformationType(item, informationType)),
@@ -512,7 +581,7 @@ export default function DashboardPage() {
                 </label>
                 <label className="report-info-row">
                   <span>所在地</span>
-                  <input value={address} onChange={(event) => setAddress(event.target.value)} />
+                  <input value={address} onChange={(event) => handleAddressChange(event.target.value)} />
                 </label>
                 <label className="report-info-row">
                   <span>敷地面積</span>
@@ -540,13 +609,18 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <ErrorFallbackBanner messages={warnings} />
+        <ErrorFallbackBanner messages={mergeWarnings(warnings, [targetLookupWarning])} />
         {modeNotice ? <div className="mode-notice">{modeNotice}</div> : null}
 
         <section className="evidence-grid" aria-label="周辺資料">
           <div className="report-map">
             <div className="section-toolbar">
               <SectionLabel label="エリア" />
+              <TargetPlacementButton
+                active={targetPlacementActive}
+                busy={targetLookupInProgress}
+                onToggle={() => setTargetPlacementActive((current) => !current)}
+              />
               <SelectionActionButtons
                 itemLabel={selectionItemLabel}
                 selectedCount={activeSelectedCount}
@@ -572,9 +646,11 @@ export default function DashboardPage() {
                   markerMode={mapMarkerMode}
                   selectedAreaKeys={selectedAreaKeys}
                   target={target}
+                  targetPlacementActive={targetPlacementActive}
                   onToggleCase={handleToggleCase}
                   onToggleArea={handleToggleMapArea}
                   onToggleLandPoint={handleToggleLandPoint}
+                  onPickTarget={handlePickTarget}
                 />
               )}
             </div>
@@ -612,6 +688,7 @@ export default function DashboardPage() {
               emptyLabel={informationType === "公示地価" && !showAllProperties ? "選択エリア内の地価地点なし" : "地価地点なし"}
               points={visibleLatestPoints}
               selectedPointIds={selectedLandPointIds}
+              onSetPointSelection={handleSetLandPointSelection}
               onToggle={handleToggleLandPoint}
             />
             <HistoryTable rows={historyRows} />
@@ -695,6 +772,33 @@ function VisibilityToggleButton({
       <span className="report-toggle-label" hidden={showAllProperties}>
         {allItemsLabel}
       </span>
+    </button>
+  );
+}
+
+function TargetPlacementButton({
+  active,
+  busy,
+  onToggle
+}: {
+  active: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  const label = busy ? "住所取得中" : active ? "査定地指定中" : "査定地指定";
+
+  return (
+    <button
+      aria-label={label}
+      aria-pressed={active}
+      className={`target-placement-button${active ? " is-active" : ""}`}
+      disabled={busy}
+      title={active ? "地図をクリックして査定地を指定" : "査定地を地図で指定"}
+      type="button"
+      onClick={onToggle}
+    >
+      <MapPin aria-hidden="true" size={14} strokeWidth={2.5} />
+      <span>{label}</span>
     </button>
   );
 }
@@ -845,19 +949,32 @@ function LandPointTable({
   emptyLabel,
   points,
   selectedPointIds,
+  onSetPointSelection,
   onToggle
 }: {
   emptyLabel: string;
   points: PublicLandPricePoint[];
   selectedPointIds: string[];
+  onSetPointSelection: (pointIds: string[], selected: boolean) => void;
   onToggle: (pointId: string) => void;
 }) {
+  const selectedPointCount = points.filter((point) => selectedPointIds.includes(point.pointId)).length;
+  const allPointsSelected = points.length > 0 && selectedPointCount === points.length;
+
   return (
     <div className="land-table-wrap">
       <table className="land-table">
         <thead>
           <tr>
-            <th>選択</th>
+            <th>
+              <SelectAllRowsCheckbox
+                checked={allPointsSelected}
+                disabled={points.length === 0}
+                indeterminate={selectedPointCount > 0 && selectedPointCount < points.length}
+                label="表示中の公示地価をすべて選択する、または解除する"
+                onToggle={() => onSetPointSelection(points.map((point) => point.pointId), !allPointsSelected)}
+              />
+            </th>
             <th>地点</th>
             <th>価格</th>
             <th>変動率</th>

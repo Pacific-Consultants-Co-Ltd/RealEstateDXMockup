@@ -26,6 +26,11 @@ export interface MapArea {
   count: number;
 }
 
+export interface TargetPickLocation {
+  latitude: number;
+  longitude: number;
+}
+
 export interface CaseMapMarker {
   areaKey: string;
   id: string;
@@ -61,6 +66,8 @@ interface MapViewProps {
   markerMode: MapMarkerMode;
   selectedAreaKeys: string[];
   target: TargetLocation;
+  targetPlacementActive: boolean;
+  onPickTarget: (location: TargetPickLocation) => void;
   onToggleCase: (id: string) => void;
   onToggleArea: (areaKey: string) => void;
   onToggleLandPoint: (pointId: string) => void;
@@ -419,6 +426,29 @@ function BoundaryViewport({ onBboxChange }: { onBboxChange: (bbox: string) => vo
   return null;
 }
 
+function TargetPlacementEvents({
+  active,
+  onPickTarget
+}: {
+  active: boolean;
+  onPickTarget: (location: TargetPickLocation) => void;
+}) {
+  useMapEvents({
+    click: (event) => {
+      if (!active) {
+        return;
+      }
+
+      onPickTarget({
+        latitude: event.latlng.lat,
+        longitude: event.latlng.lng
+      });
+    }
+  });
+
+  return null;
+}
+
 function TargetViewport({ target }: { target: TargetLocation }) {
   const map = useMap();
 
@@ -624,6 +654,8 @@ export default function MapView({
   markerMode,
   selectedAreaKeys,
   target,
+  targetPlacementActive,
+  onPickTarget,
   onToggleArea,
   onToggleCase,
   onToggleLandPoint
@@ -641,7 +673,9 @@ export default function MapView({
   ]);
   const selectedAreaSet = useMemo(() => new Set(selectedAreaKeys), [selectedAreaKeys]);
   const availableAreaSetRef = useRef(availableAreaSet);
+  const onPickTargetRef = useRef(onPickTarget);
   const selectedAreaSetRef = useRef(selectedAreaSet);
+  const targetPlacementActiveRef = useRef(targetPlacementActive);
   const boundaryKeySignature = requestedBoundaryKeys.join(",");
   const boundaryLayerKey = useMemo(() => `boundaries-${boundaryBbox}-${boundaryLayerFilter}-${boundaryKeySignature}`, [
     boundaryBbox,
@@ -718,8 +752,10 @@ export default function MapView({
 
   useEffect(() => {
     availableAreaSetRef.current = availableAreaSet;
+    onPickTargetRef.current = onPickTarget;
     selectedAreaSetRef.current = selectedAreaSet;
-  }, [availableAreaSet, selectedAreaSet]);
+    targetPlacementActiveRef.current = targetPlacementActive;
+  }, [availableAreaSet, onPickTarget, selectedAreaSet, targetPlacementActive]);
 
   useEffect(() => {
     if (!boundaryBbox && requestedBoundaryKeys.length === 0) {
@@ -794,6 +830,14 @@ export default function MapView({
     layer.on({
       click: (event: LeafletMouseEvent) => {
         stopMapClick(event);
+        if (targetPlacementActiveRef.current) {
+          onPickTargetRef.current({
+            latitude: event.latlng.lat,
+            longitude: event.latlng.lng
+          });
+          return;
+        }
+
         onToggleArea(areaKey);
       },
       mouseout: () => {
@@ -815,7 +859,7 @@ export default function MapView({
 
   return (
     <section className="map-panel">
-      <div className="map-frame">
+      <div className={`map-frame${targetPlacementActive ? " is-target-placement-active" : ""}`}>
         <MapContainer
           attributionControl={false}
           center={[target.latitude, target.longitude]}
@@ -827,6 +871,7 @@ export default function MapView({
           zoomControl={false}
         >
           <BoundaryViewport onBboxChange={handleBboxChange} />
+          <TargetPlacementEvents active={targetPlacementActive} onPickTarget={onPickTarget} />
           <TargetViewport target={target} />
           <ZoomControl position="bottomright" />
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -858,6 +903,14 @@ export default function MapView({
                   eventHandlers={{
                     click: (event) => {
                       stopMapClick(event);
+                      if (targetPlacementActive) {
+                        onPickTarget({
+                          latitude: event.latlng.lat,
+                          longitude: event.latlng.lng
+                        });
+                        return;
+                      }
+
                       onToggleCase(marker.id);
                     },
                     mousemove: closeBoundaryTooltips,
@@ -886,6 +939,14 @@ export default function MapView({
                   eventHandlers={{
                     click: (event) => {
                       stopMapClick(event);
+                      if (targetPlacementActive) {
+                        onPickTarget({
+                          latitude: event.latlng.lat,
+                          longitude: event.latlng.lng
+                        });
+                        return;
+                      }
+
                       onToggleLandPoint(marker.pointId);
                     },
                     mousemove: closeBoundaryTooltips,
