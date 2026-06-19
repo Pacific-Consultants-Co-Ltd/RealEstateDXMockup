@@ -89,6 +89,7 @@ type BoundaryFeature = Feature<Geometry, BoundaryProperties>;
 type BoundaryFeatureCollection = FeatureCollection<Geometry, BoundaryProperties>;
 type BoundaryLayerFilter = "all" | "market-data";
 
+const BOUNDARY_LAYER_FILTER_STORAGE_KEY = "real-estate-dx-map-boundary-layer-filter";
 const OSAKA_MAP_BOUNDS: LatLngBoundsExpression = [
   [34.271799, 135.091699],
   [35.051394, 135.746794]
@@ -100,6 +101,31 @@ const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[
   { value: "all", label: "すべて" },
   { value: "market-data", label: "市場データのみ" }
 ];
+
+function isBoundaryLayerFilter(value: string | null): value is BoundaryLayerFilter {
+  return boundaryLayerFilterOptions.some((option) => option.value === value);
+}
+
+function readStoredBoundaryLayerFilter(): BoundaryLayerFilter {
+  if (typeof window === "undefined") {
+    return "all";
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(BOUNDARY_LAYER_FILTER_STORAGE_KEY);
+    return isBoundaryLayerFilter(storedValue) ? storedValue : "all";
+  } catch {
+    return "all";
+  }
+}
+
+function storeBoundaryLayerFilter(value: BoundaryLayerFilter) {
+  try {
+    window.localStorage.setItem(BOUNDARY_LAYER_FILTER_STORAGE_KEY, value);
+  } catch {
+    // Ignore storage failures so the in-session map control still works.
+  }
+}
 
 const targetPointIcon = L.divIcon({
   className: "map-point-icon map-point-icon-target",
@@ -661,7 +687,7 @@ export default function MapView({
   const [boundaryData, setBoundaryData] = useState<BoundaryFeatureCollection | null>(null);
   const [boundaryError, setBoundaryError] = useState(false);
   const [boundaryBbox, setBoundaryBbox] = useState("");
-  const [boundaryLayerFilter, setBoundaryLayerFilter] = useState<BoundaryLayerFilter>("all");
+  const [boundaryLayerFilter, setBoundaryLayerFilter] = useState<BoundaryLayerFilter>(readStoredBoundaryLayerFilter);
   const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
 
   const areaByKey = useMemo(() => new Map(areas.map((area) => [area.key, area])), [areas]);
@@ -731,6 +757,10 @@ export default function MapView({
   );
   const handleBboxChange = useCallback((bbox: string) => {
     setBoundaryBbox((current) => (current === bbox ? current : bbox));
+  }, []);
+  const handleBoundaryLayerFilterChange = useCallback((value: BoundaryLayerFilter) => {
+    setBoundaryLayerFilter(value);
+    storeBoundaryLayerFilter(value);
   }, []);
   const closeBoundaryTooltips = useCallback(() => {
     boundaryLayerRef.current?.eachLayer((layer) => {
@@ -974,7 +1004,7 @@ export default function MapView({
           target={target}
           visibleMarkerCount={visiblePrimaryMarkerCount}
         />
-        <MapControls layerFilter={boundaryLayerFilter} onLayerFilterChange={setBoundaryLayerFilter} />
+        <MapControls layerFilter={boundaryLayerFilter} onLayerFilterChange={handleBoundaryLayerFilterChange} />
         {boundaryError ? <div className="map-boundary-status">境界データを読み込めませんでした</div> : null}
       </div>
     </section>
