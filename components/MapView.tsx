@@ -96,6 +96,9 @@ const OSAKA_MAP_BOUNDS: LatLngBoundsExpression = [
 ];
 const MAP_TOOLTIP_PANE = "map-tooltip-pane";
 const SELECTION_ACCENT = "#006f7d";
+const GSI_PALE_TILE_ATTRIBUTION =
+  '出典：<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院</a>';
+const GSI_PALE_TILE_URL = "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png";
 
 const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[] = [
   { value: "all", label: "すべて" },
@@ -889,7 +892,6 @@ export default function MapView({
     <section className="map-panel">
       <div className={`map-frame${targetPlacementActive ? " is-target-placement-active" : ""}`}>
         <MapContainer
-          attributionControl={false}
           center={[target.latitude, target.longitude]}
           maxBounds={OSAKA_MAP_BOUNDS}
           maxBoundsViscosity={1}
@@ -902,7 +904,7 @@ export default function MapView({
           <TargetPlacementEvents active={targetPlacementActive} onPickTarget={onPickTarget} />
           <TargetViewport target={target} />
           <ZoomControl position="bottomright" />
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <TileLayer attribution={GSI_PALE_TILE_ATTRIBUTION} url={GSI_PALE_TILE_URL} />
           <Pane name={MAP_TOOLTIP_PANE} style={{ zIndex: 760, pointerEvents: "none" }} />
           <Pane name="boundary-pane" style={{ zIndex: 410 }}>
             {visibleBoundaryData ? (
