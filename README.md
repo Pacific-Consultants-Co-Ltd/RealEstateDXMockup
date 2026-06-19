@@ -60,6 +60,7 @@ Both routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLIB_API_KEY
 
 1. Choose `情報種別`.
    - `取引事例` shows Real Estate Information Library transaction data.
+   - `全事例` shows Real Estate Information Library transaction data and the preloaded CSV data together.
    - `成約事例` and `自社データ` show the preloaded CSV data.
    - `公示地価` focuses the map/table on public land-price point selection.
 2. Confirm or edit `所在地`; this moves the valuation target marker on the map.

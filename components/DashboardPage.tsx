@@ -141,6 +141,10 @@ function areaLabelForInformationType(address: string, informationType: Informati
 }
 
 function caseSourceMatchesInformationType(comparable: ComparableCase, informationType: InformationType): boolean {
+  if (informationType === "全事例") {
+    return comparable.source === "mlit_transaction" || comparable.source === "csv";
+  }
+
   if (informationType === "取引事例") {
     return comparable.source === "mlit_transaction";
   }
@@ -495,6 +499,7 @@ export default function DashboardPage() {
                   <span>情報種別</span>
                   <select value={informationType} onChange={(event) => handleInformationTypeChange(event.target.value as InformationType)}>
                     <option>取引事例</option>
+                    <option>全事例</option>
                     <option>成約事例</option>
                     <option>公示地価</option>
                     <option>自社データ</option>

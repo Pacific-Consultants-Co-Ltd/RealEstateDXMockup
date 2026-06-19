@@ -1,6 +1,6 @@
 export type ComparableCaseSource = "csv" | "mlit_transaction" | "mlit_land_price" | "manual";
 
-export type InformationType = "取引事例" | "成約事例" | "公示地価" | "自社データ";
+export type InformationType = "取引事例" | "全事例" | "成約事例" | "公示地価" | "自社データ";
 
 export interface ComparableCase {
   id: string;
