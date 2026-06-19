@@ -5,9 +5,9 @@ import { Layers, ListChecks, MapPin } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import {
-  CircleMarker,
   GeoJSON as GeoJSONLayer,
   MapContainer,
+  Marker,
   Pane,
   TileLayer,
   Tooltip,
@@ -16,6 +16,7 @@ import {
   ZoomControl
 } from "react-leaflet";
 
+import { areaLabelFromAddress } from "@/lib/areaKeys";
 import type { TargetLocation } from "@/lib/types";
 
 export interface MapArea {
@@ -100,6 +101,36 @@ const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[
   { value: "market-data", label: "市場データのみ" }
 ];
 
+const targetPointIcon = L.divIcon({
+  className: "map-point-icon map-point-icon-target",
+  iconAnchor: [13, 13],
+  iconSize: [26, 26]
+});
+
+const casePointIcon = L.divIcon({
+  className: "map-point-icon map-point-icon-case",
+  iconAnchor: [6, 6],
+  iconSize: [12, 12]
+});
+
+const selectedCasePointIcon = L.divIcon({
+  className: "map-point-icon map-point-icon-case is-selected",
+  iconAnchor: [10, 10],
+  iconSize: [20, 20]
+});
+
+const landPricePointIcon = L.divIcon({
+  className: "map-point-icon map-point-icon-land",
+  iconAnchor: [7, 7],
+  iconSize: [14, 14]
+});
+
+const selectedLandPricePointIcon = L.divIcon({
+  className: "map-point-icon map-point-icon-land is-selected",
+  iconAnchor: [11, 11],
+  iconSize: [22, 22]
+});
+
 interface MapCoordinate {
   latitude: number;
   longitude: number;
@@ -115,51 +146,6 @@ type SnappableMarker = {
   latitude: number;
   longitude: number;
   snapToAreaCentroid: boolean;
-};
-
-const targetMarkerStyle: PathOptions = {
-  className: "map-marker map-marker-target",
-  color: "#142235",
-  fillColor: "#ffffff",
-  fillOpacity: 0.95,
-  opacity: 1,
-  weight: 3
-};
-
-const selectedCaseMarkerStyle: PathOptions = {
-  className: "map-marker map-marker-case is-selected",
-  color: SELECTION_ACCENT,
-  fillColor: SELECTION_ACCENT,
-  fillOpacity: 0.88,
-  opacity: 1,
-  weight: 3
-};
-
-const caseMarkerStyle: PathOptions = {
-  className: "map-marker map-marker-case",
-  color: "#005bac",
-  fillColor: "#ffffff",
-  fillOpacity: 0.92,
-  opacity: 1,
-  weight: 2.5
-};
-
-const selectedLandMarkerStyle: PathOptions = {
-  className: "map-marker map-marker-land is-selected",
-  color: SELECTION_ACCENT,
-  fillColor: "#1f7564",
-  fillOpacity: 0.9,
-  opacity: 1,
-  weight: 3
-};
-
-const landMarkerStyle: PathOptions = {
-  className: "map-marker map-marker-land",
-  color: "#1f7564",
-  fillColor: "#ffffff",
-  fillOpacity: 0.95,
-  opacity: 1,
-  weight: 2.5
 };
 
 function stopMapClick(event: LeafletMouseEvent) {
@@ -205,9 +191,10 @@ function boundaryStyleForSelection(
   }
 
   return {
-    color: selected ? SELECTION_ACCENT : "#005bac",
-    fillColor: selected ? SELECTION_ACCENT : "#4f91cc",
-    fillOpacity: selected ? 0.24 : 0.12,
+    color: selected ? SELECTION_ACCENT : "#1d6fa8",
+    dashArray: undefined,
+    fillColor: selected ? SELECTION_ACCENT : "#5ea6dc",
+    fillOpacity: selected ? 0.25 : 0.13,
     opacity: selected ? 1 : 0.95,
     weight: selected ? 3 : 2
   };
@@ -575,6 +562,14 @@ function MapLayerFilter({
   );
 }
 
+function compactTargetAddress(address: string): string {
+  if (/^-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?$/.test(address)) {
+    return "選択地点";
+  }
+
+  return areaLabelFromAddress(address) || "選択地点";
+}
+
 function MapContextPanel({
   areaCount,
   primaryMarkerLabel,
@@ -591,6 +586,7 @@ function MapContextPanel({
   visibleMarkerCount: number;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const compactAddress = compactTargetAddress(target.address);
 
   return (
     <details
@@ -607,10 +603,11 @@ function MapContextPanel({
         </span>
         <div>
           <span>査定地</span>
-          <strong>{target.address}</strong>
+          <strong>{compactAddress}</strong>
         </div>
         <span className="map-context-toggle-icon" aria-hidden="true" />
       </summary>
+      <p className="map-context-address">{target.address}</p>
       <dl className="map-context-stats">
         <div>
           <dt>{primaryMarkerLabel}</dt>
@@ -850,8 +847,8 @@ export default function MapView({
         if (layer instanceof L.Path) {
           const selected = selectedAreaSetRef.current.has(areaKey);
           layer.setStyle({
-            fillOpacity: selected ? 0.32 : 0.18,
-            weight: selected ? 3.1 : 2
+            fillOpacity: selected ? 0.28 : 0.19,
+            weight: selected ? 2.9 : 1.7
           });
         }
       }
@@ -889,18 +886,17 @@ export default function MapView({
             ) : null}
           </Pane>
           <Pane name="point-pane" style={{ zIndex: 430 }}>
-            <CircleMarker center={[target.latitude, target.longitude]} pathOptions={targetMarkerStyle} radius={7}>
+            <Marker icon={targetPointIcon} position={[target.latitude, target.longitude]} zIndexOffset={900}>
               <Tooltip className="map-point-tooltip" direction="top" offset={[0, -6]} pane={MAP_TOOLTIP_PANE}>
                 <strong>査定地</strong>
                 <span>{target.address}</span>
               </Tooltip>
-            </CircleMarker>
+            </Marker>
             {renderableCaseMarkers.map((marker) => {
               const position = snapMarkerToBoundary(marker, boundarySpatialIndex);
 
               return (
-                <CircleMarker
-                  center={[position.latitude, position.longitude]}
+                <Marker
                   eventHandlers={{
                     click: (event) => {
                       stopMapClick(event);
@@ -917,9 +913,10 @@ export default function MapView({
                     mousemove: closeBoundaryTooltips,
                     mouseover: closeBoundaryTooltips
                   }}
+                  icon={marker.selected ? selectedCasePointIcon : casePointIcon}
                   key={marker.id}
-                  pathOptions={marker.selected ? selectedCaseMarkerStyle : caseMarkerStyle}
-                  radius={marker.selected ? 8 : 6}
+                  position={[position.latitude, position.longitude]}
+                  zIndexOffset={marker.selected ? 620 : 120}
                 >
                   <MarkerTooltip
                     detailLabel={marker.detailLabel}
@@ -928,15 +925,14 @@ export default function MapView({
                     title={marker.label}
                     valueLabel={marker.valueLabel}
                   />
-                </CircleMarker>
+                </Marker>
               );
             })}
             {renderableLandPriceMarkers.map((marker) => {
               const position = snapMarkerToBoundary(marker, boundarySpatialIndex);
 
               return (
-                <CircleMarker
-                  center={[position.latitude, position.longitude]}
+                <Marker
                   eventHandlers={{
                     click: (event) => {
                       stopMapClick(event);
@@ -953,9 +949,10 @@ export default function MapView({
                     mousemove: closeBoundaryTooltips,
                     mouseover: closeBoundaryTooltips
                   }}
+                  icon={marker.selected ? selectedLandPricePointIcon : landPricePointIcon}
                   key={marker.pointId}
-                  pathOptions={marker.selected ? selectedLandMarkerStyle : landMarkerStyle}
-                  radius={marker.selected ? 8 : 6}
+                  position={[position.latitude, position.longitude]}
+                  zIndexOffset={marker.selected ? 620 : 120}
                 >
                   <MarkerTooltip
                     detailLabel={marker.detailLabel}
@@ -964,7 +961,7 @@ export default function MapView({
                     title={marker.label}
                     valueLabel={marker.valueLabel}
                   />
-                </CircleMarker>
+                </Marker>
               );
             })}
           </Pane>

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Eye, EyeOff, MapPin, SquareCheck, SquareX } from "lucide-react";
+import { Eye, EyeOff, MapPin, MapPinOff, SquareCheck, SquareX } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -270,6 +270,7 @@ export default function DashboardPage() {
   const [address, setAddress] = useState(targetLocation.address);
   const [targetOverride, setTargetOverride] = useState<TargetLocation | undefined>();
   const [targetPlacementActive, setTargetPlacementActive] = useState(false);
+  const [targetPlacementBaseAddress, setTargetPlacementBaseAddress] = useState<string | undefined>();
   const [targetLookupWarning, setTargetLookupWarning] = useState<string | undefined>();
   const [targetLookupInProgress, setTargetLookupInProgress] = useState(false);
   const [landTsubo, setLandTsubo] = useState(100);
@@ -282,6 +283,7 @@ export default function DashboardPage() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [headerScrolled, setHeaderScrolled] = useState(false);
+  const targetLookupRequestIdRef = useRef(0);
 
   async function loadAllData() {
     setLoading(true);
@@ -334,12 +336,43 @@ export default function DashboardPage() {
   }
 
   function handleAddressChange(nextAddress: string) {
+    targetLookupRequestIdRef.current += 1;
     setAddress(nextAddress);
     setTargetOverride(undefined);
+    setTargetPlacementBaseAddress(undefined);
+    setTargetPlacementActive(false);
     setTargetLookupWarning(undefined);
+    setTargetLookupInProgress(false);
+  }
+
+  function handleTargetPlacementToggle() {
+    setTargetPlacementActive((current) => {
+      if (current) {
+        if (!targetOverride) {
+          setTargetPlacementBaseAddress(undefined);
+        }
+
+        return false;
+      }
+
+      setTargetPlacementBaseAddress((currentBaseAddress) => (targetOverride ? currentBaseAddress : address));
+      return true;
+    });
+  }
+
+  function handleClearTargetPin() {
+    targetLookupRequestIdRef.current += 1;
+    setTargetPlacementActive(false);
+    setTargetLookupInProgress(false);
+    setTargetLookupWarning(undefined);
+    setTargetOverride(undefined);
+    setAddress(targetPlacementBaseAddress ?? targetLocation.address);
+    setTargetPlacementBaseAddress(undefined);
   }
 
   async function handlePickTarget(location: TargetPickLocation) {
+    const requestId = targetLookupRequestIdRef.current + 1;
+    targetLookupRequestIdRef.current = requestId;
     const fallbackAddress = coordinateAddress(location);
     setTargetPlacementActive(false);
     setTargetLookupInProgress(true);
@@ -359,6 +392,10 @@ export default function DashboardPage() {
       const payload = await requestJson<ReverseGeocodeResponse>(`/api/geocode/reverse?${params.toString()}`);
       const nextAddress = payload.address || fallbackAddress;
 
+      if (targetLookupRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setAddress(nextAddress);
       setTargetOverride({
         address: nextAddress,
@@ -367,9 +404,15 @@ export default function DashboardPage() {
       });
       setTargetLookupWarning(payload.warning);
     } catch (error) {
+      if (targetLookupRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setTargetLookupWarning(error instanceof Error ? error.message : "住所を取得できなかったため、座標を表示しています。");
     } finally {
-      setTargetLookupInProgress(false);
+      if (targetLookupRequestIdRef.current === requestId) {
+        setTargetLookupInProgress(false);
+      }
     }
   }
 
@@ -619,8 +662,9 @@ export default function DashboardPage() {
               <TargetPlacementButton
                 active={targetPlacementActive}
                 busy={targetLookupInProgress}
-                onToggle={() => setTargetPlacementActive((current) => !current)}
+                onToggle={handleTargetPlacementToggle}
               />
+              {targetOverride ? <TargetPinClearButton onClear={handleClearTargetPin} /> : null}
               <SelectionActionButtons
                 itemLabel={selectionItemLabel}
                 selectedCount={activeSelectedCount}
@@ -799,6 +843,16 @@ function TargetPlacementButton({
     >
       <MapPin aria-hidden="true" size={14} strokeWidth={2.5} />
       <span>{label}</span>
+    </button>
+  );
+}
+
+function TargetPinClearButton({ onClear }: { onClear: () => void }) {
+  const label = "指定した査定地を解除";
+
+  return (
+    <button aria-label={label} className="target-clear-button" title={label} type="button" onClick={onClear}>
+      <MapPinOff aria-hidden="true" size={14} strokeWidth={2.5} />
     </button>
   );
 }
