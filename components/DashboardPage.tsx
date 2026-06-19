@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Eye, EyeOff, SquareCheck, SquareX } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import ErrorFallbackBanner from "@/components/ErrorFallbackBanner";
 import LoadingState from "@/components/LoadingState";
@@ -322,6 +322,11 @@ export default function DashboardPage() {
     setCases((current) => current.map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
   }
 
+  function handleSetCaseSelection(ids: string[], selected: boolean) {
+    const targetIds = new Set(ids);
+    setCases((current) => current.map((item) => (targetIds.has(item.id) ? { ...item, selected } : item)));
+  }
+
   function handleToggleLandPoint(pointId: string) {
     setSelectedLandPointIds((current) =>
       current.includes(pointId) ? current.filter((id) => id !== pointId) : [...current, pointId]
@@ -631,12 +636,14 @@ export default function DashboardPage() {
               calculationTargetCount={selectedVisibleCases.length}
               cases={focusedCaseRows}
               informationType={informationType}
+              onSetCaseSelection={handleSetCaseSelection}
               onToggleCase={handleToggleCase}
             />
             <PropertyTable
               cases={visibleCases}
               informationType={informationType}
               selectedCount={selectedVisibleCases.length}
+              onSetCaseSelection={handleSetCaseSelection}
               onToggleCase={handleToggleCase}
             />
           </>
@@ -886,17 +893,57 @@ function LandPointTable({
   );
 }
 
+function SelectAllRowsCheckbox({
+  checked,
+  disabled,
+  indeterminate,
+  label,
+  onToggle
+}: {
+  checked: boolean;
+  disabled: boolean;
+  indeterminate: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  const checkboxRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={checkboxRef}
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      title={label}
+      type="checkbox"
+      onChange={onToggle}
+    />
+  );
+}
+
 function SelectedCaseTable({
   calculationTargetCount,
   cases,
   informationType,
+  onSetCaseSelection,
   onToggleCase
 }: {
   calculationTargetCount: number;
   cases: ComparableCase[];
   informationType: InformationType;
+  onSetCaseSelection: (ids: string[], selected: boolean) => void;
   onToggleCase: (id: string) => void;
 }) {
+  const selectedCount = cases.filter((comparable) => comparable.selected).length;
+  const allRowsSelected = cases.length > 0 && selectedCount === cases.length;
+
   return (
     <section className="selected-case-panel">
       <div className="panel-heading compact selected-case-heading">
@@ -909,7 +956,15 @@ function SelectedCaseTable({
         <table className="selected-case-table">
           <thead>
             <tr>
-              <th>計算</th>
+              <th>
+                <SelectAllRowsCheckbox
+                  checked={allRowsSelected}
+                  disabled={cases.length === 0}
+                  indeterminate={selectedCount > 0 && selectedCount < cases.length}
+                  label={`表示中の${informationType}をすべて計算対象にする、または解除する`}
+                  onToggle={() => onSetCaseSelection(cases.map((comparable) => comparable.id), !allRowsSelected)}
+                />
+              </th>
               <th>町丁目</th>
               <th>所在地</th>
               <th>土地</th>
@@ -956,13 +1011,17 @@ function PropertyTable({
   cases,
   informationType,
   selectedCount,
+  onSetCaseSelection,
   onToggleCase
 }: {
   cases: ComparableCase[];
   informationType: InformationType;
   selectedCount: number;
+  onSetCaseSelection: (ids: string[], selected: boolean) => void;
   onToggleCase: (id: string) => void;
 }) {
+  const allRowsSelected = cases.length > 0 && selectedCount === cases.length;
+
   return (
     <section className="property-panel">
       <div className="panel-heading compact property-heading">
@@ -975,7 +1034,15 @@ function PropertyTable({
         <table className="property-table">
           <thead>
             <tr>
-              <th>選択</th>
+              <th>
+                <SelectAllRowsCheckbox
+                  checked={allRowsSelected}
+                  disabled={cases.length === 0}
+                  indeterminate={selectedCount > 0 && selectedCount < cases.length}
+                  label={`表示中の${informationType}をすべて選択する、または解除する`}
+                  onToggle={() => onSetCaseSelection(cases.map((comparable) => comparable.id), !allRowsSelected)}
+                />
+              </th>
               <th>町丁目</th>
               <th>所在地</th>
               <th>最寄駅</th>
