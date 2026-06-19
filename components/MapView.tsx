@@ -3,7 +3,7 @@
 import L, { type LatLngBoundsExpression, type LeafletMouseEvent, type PathOptions } from "leaflet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
-import { GeoJSON as GeoJSONLayer, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { CircleMarker, GeoJSON as GeoJSONLayer, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 
 import type { TargetLocation } from "@/lib/types";
 
@@ -15,11 +15,40 @@ export interface MapArea {
   count: number;
 }
 
+export interface CaseMapMarker {
+  id: string;
+  label: string;
+  subtitle: string;
+  valueLabel: string;
+  detailLabel: string;
+  latitude: number;
+  longitude: number;
+  selected: boolean;
+}
+
+export interface LandPriceMapMarker {
+  pointId: string;
+  label: string;
+  subtitle: string;
+  valueLabel: string;
+  detailLabel: string;
+  latitude: number;
+  longitude: number;
+  selected: boolean;
+}
+
+export type MapMarkerMode = "cases" | "land-price";
+
 interface MapViewProps {
   areas: MapArea[];
+  caseMarkers: CaseMapMarker[];
+  landPriceMarkers: LandPriceMapMarker[];
+  markerMode: MapMarkerMode;
   selectedAreaKeys: string[];
   target: TargetLocation;
+  onToggleCase: (id: string) => void;
   onToggleArea: (areaKey: string) => void;
+  onToggleLandPoint: (pointId: string) => void;
 }
 
 type BoundaryProperties = {
@@ -42,6 +71,46 @@ const boundaryLayerFilterOptions: { value: BoundaryLayerFilter; label: string }[
   { value: "all", label: "すべて" },
   { value: "market-data", label: "市場データのみ" }
 ];
+
+const targetMarkerStyle: PathOptions = {
+  color: "#142235",
+  fillColor: "#ffffff",
+  fillOpacity: 0.95,
+  opacity: 1,
+  weight: 3
+};
+
+const selectedCaseMarkerStyle: PathOptions = {
+  color: "#c8322a",
+  fillColor: "#c8322a",
+  fillOpacity: 0.88,
+  opacity: 1,
+  weight: 3
+};
+
+const caseMarkerStyle: PathOptions = {
+  color: "#005bac",
+  fillColor: "#ffffff",
+  fillOpacity: 0.92,
+  opacity: 1,
+  weight: 2.5
+};
+
+const selectedLandMarkerStyle: PathOptions = {
+  color: "#c8322a",
+  fillColor: "#1f7564",
+  fillOpacity: 0.9,
+  opacity: 1,
+  weight: 3
+};
+
+const landMarkerStyle: PathOptions = {
+  color: "#1f7564",
+  fillColor: "#ffffff",
+  fillOpacity: 0.95,
+  opacity: 1,
+  weight: 2.5
+};
 
 function stopMapClick(event: LeafletMouseEvent) {
   L.DomEvent.stopPropagation(event.originalEvent);
@@ -108,6 +177,16 @@ function BoundaryViewport({ onBboxChange }: { onBboxChange: (bbox: string) => vo
   return null;
 }
 
+function TargetViewport({ target }: { target: TargetLocation }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.panTo([target.latitude, target.longitude], { animate: true });
+  }, [map, target.latitude, target.longitude]);
+
+  return null;
+}
+
 function MapLegend() {
   return (
     <details
@@ -133,8 +212,54 @@ function MapLegend() {
           <i className="legend-symbol legend-area-no-data" aria-hidden="true" />
           データなし
         </span>
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-target" aria-hidden="true" />
+          査定地
+        </span>
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-case" aria-hidden="true" />
+          事例
+        </span>
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-case-selected" aria-hidden="true" />
+          選択事例
+        </span>
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-land-price" aria-hidden="true" />
+          公示地価
+        </span>
+        <span className="map-legend-item">
+          <i className="legend-symbol legend-land-price-selected" aria-hidden="true" />
+          選択地価
+        </span>
       </div>
     </details>
+  );
+}
+
+function MarkerTooltip({
+  detailLabel,
+  selected,
+  subtitle,
+  title,
+  valueLabel
+}: {
+  detailLabel: string;
+  selected: boolean;
+  subtitle: string;
+  title: string;
+  valueLabel: string;
+}) {
+  return (
+    <Tooltip className="map-point-tooltip" direction="top" offset={[0, -6]}>
+      <strong>{title}</strong>
+      <span>{subtitle}</span>
+      <em>
+        {valueLabel}
+        {detailLabel ? ` / ${detailLabel}` : ""}
+      </em>
+      <small>{selected ? "選択中" : "クリックで選択"}</small>
+    </Tooltip>
   );
 }
 
@@ -192,9 +317,14 @@ function MapControls({
 
 export default function MapView({
   areas,
+  caseMarkers,
+  landPriceMarkers,
+  markerMode,
   selectedAreaKeys,
   target,
-  onToggleArea
+  onToggleArea,
+  onToggleCase,
+  onToggleLandPoint
 }: MapViewProps) {
   const [boundaryData, setBoundaryData] = useState<BoundaryFeatureCollection | null>(null);
   const [boundaryError, setBoundaryError] = useState(false);
@@ -221,6 +351,8 @@ export default function MapView({
       features: boundaryData.features.filter((feature) => featureHasMarketData(feature, availableAreaSet))
     };
   }, [availableAreaSet, boundaryData, boundaryLayerFilter]);
+  const activeCaseMarkers = markerMode === "cases" ? caseMarkers : [];
+  const activeLandPriceMarkers = landPriceMarkers;
   const handleBboxChange = useCallback((bbox: string) => {
     setBoundaryBbox((current) => (current === bbox ? current : bbox));
   }, []);
@@ -333,6 +465,7 @@ export default function MapView({
           zoom={13}
         >
           <BoundaryViewport onBboxChange={handleBboxChange} />
+          <TargetViewport target={target} />
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {visibleBoundaryData ? (
             <GeoJSONLayer
@@ -343,6 +476,56 @@ export default function MapView({
               style={boundaryStyle}
             />
           ) : null}
+          <CircleMarker center={[target.latitude, target.longitude]} pathOptions={targetMarkerStyle} radius={7}>
+            <Tooltip className="map-point-tooltip" direction="top" offset={[0, -6]}>
+              <strong>査定地</strong>
+              <span>{target.address}</span>
+            </Tooltip>
+          </CircleMarker>
+          {activeCaseMarkers.map((marker) => (
+            <CircleMarker
+              center={[marker.latitude, marker.longitude]}
+              eventHandlers={{
+                click: (event) => {
+                  stopMapClick(event);
+                  onToggleCase(marker.id);
+                }
+              }}
+              key={marker.id}
+              pathOptions={marker.selected ? selectedCaseMarkerStyle : caseMarkerStyle}
+              radius={marker.selected ? 8 : 6}
+            >
+              <MarkerTooltip
+                detailLabel={marker.detailLabel}
+                selected={marker.selected}
+                subtitle={marker.subtitle}
+                title={marker.label}
+                valueLabel={marker.valueLabel}
+              />
+            </CircleMarker>
+          ))}
+          {activeLandPriceMarkers.map((marker) => (
+            <CircleMarker
+              center={[marker.latitude, marker.longitude]}
+              eventHandlers={{
+                click: (event) => {
+                  stopMapClick(event);
+                  onToggleLandPoint(marker.pointId);
+                }
+              }}
+              key={marker.pointId}
+              pathOptions={marker.selected ? selectedLandMarkerStyle : landMarkerStyle}
+              radius={marker.selected ? 8 : 6}
+            >
+              <MarkerTooltip
+                detailLabel={marker.detailLabel}
+                selected={marker.selected}
+                subtitle={marker.subtitle}
+                title={marker.label}
+                valueLabel={marker.valueLabel}
+              />
+            </CircleMarker>
+          ))}
         </MapContainer>
         <MapControls layerFilter={boundaryLayerFilter} onLayerFilterChange={setBoundaryLayerFilter} />
         {boundaryError ? <div className="map-boundary-status">境界データを読み込めませんでした</div> : null}

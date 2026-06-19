@@ -356,8 +356,7 @@ input[type="number"]::-webkit-outer-spin-button {
   background: var(--red);
 }
 
-.report-toggle-button,
-.recalculate-button {
+.report-toggle-button {
   align-items: center;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -368,16 +367,6 @@ input[type="number"]::-webkit-outer-spin-button {
   justify-content: center;
   min-height: 36px;
   padding: 7px 10px;
-}
-
-.recalculate-button {
-  background: var(--header-blue);
-  color: #ffffff;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset;
-}
-
-.recalculate-button:hover {
-  background: #082243;
 }
 
 .report-toggle-button {
@@ -408,17 +397,6 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .report-toggle-label {
-  white-space: nowrap;
-}
-
-.dirty-label {
-  border: 1px solid currentColor;
-  border-radius: var(--radius-sm);
-  background: #fff0ee;
-  color: var(--red);
-  font-size: 11px;
-  font-weight: 900;
-  padding: 5px 8px;
   white-space: nowrap;
 }
 
@@ -626,6 +604,89 @@ input[type="number"]::-webkit-outer-spin-button {
 .legend-area-no-data {
   background: rgba(82, 98, 118, 0.14);
   border: 2px solid var(--muted);
+}
+
+.legend-target,
+.legend-case,
+.legend-case-selected,
+.legend-land-price,
+.legend-land-price-selected {
+  border-radius: 999px;
+  height: 13px;
+  width: 13px;
+}
+
+.legend-target {
+  background: #ffffff;
+  border: 3px solid var(--ink);
+}
+
+.legend-case {
+  background: #ffffff;
+  border: 3px solid var(--blue);
+}
+
+.legend-case-selected {
+  background: var(--red);
+  border: 3px solid var(--red);
+}
+
+.legend-land-price {
+  background: #ffffff;
+  border: 3px solid var(--green);
+}
+
+.legend-land-price-selected {
+  background: var(--green);
+  border: 3px solid var(--green);
+}
+
+.map-frame .map-point-tooltip {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  display: grid;
+  gap: 2px;
+  line-height: 1.25;
+  max-width: 240px;
+  min-width: 92px;
+  padding: 7px 8px;
+  white-space: normal;
+}
+
+.map-frame .map-point-tooltip strong,
+.map-frame .map-point-tooltip span,
+.map-frame .map-point-tooltip em,
+.map-frame .map-point-tooltip small {
+  display: block;
+}
+
+.map-frame .map-point-tooltip strong {
+  color: var(--header-blue);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.map-frame .map-point-tooltip span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.map-frame .map-point-tooltip em {
+  color: var(--ink);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.map-frame .map-point-tooltip small {
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 900;
 }
 
 .map-layer-filter-body {
@@ -875,7 +936,7 @@ input[type="number"]::-webkit-outer-spin-button {
   gap: 9px;
   grid-template-columns:
     minmax(96px, 0.72fr) 18px minmax(130px, 1fr) 18px minmax(136px, 1fr) 18px
-    minmax(130px, 1fr) 24px minmax(106px, 0.78fr) 18px minmax(132px, 1fr) 92px;
+    minmax(130px, 1fr) 24px minmax(106px, 0.78fr) 18px minmax(132px, 1fr);
   padding: 12px;
 }
 
@@ -954,16 +1015,12 @@ input[type="number"]::-webkit-outer-spin-button {
   justify-content: center;
 }
 
-.recalculate-button {
-  min-height: 62px;
-}
-
 @media (max-width: 1440px) and (min-width: 1181px) {
   .formula-row {
     gap: 5px;
     grid-template-columns:
       minmax(86px, 0.62fr) 14px minmax(116px, 0.9fr) 14px minmax(124px, 0.96fr) 14px
-      minmax(118px, 0.9fr) 18px minmax(90px, 0.64fr) 14px minmax(118px, 0.9fr) 80px;
+      minmax(118px, 0.9fr) 18px minmax(90px, 0.64fr) 14px minmax(118px, 0.9fr);
     padding: 8px;
   }
 
@@ -995,11 +1052,6 @@ input[type="number"]::-webkit-outer-spin-button {
     font-size: 16px;
   }
 
-  .recalculate-button {
-    gap: 4px;
-    min-height: 55px;
-    padding-inline: 6px;
-  }
 }
 
 .selected-case-panel,

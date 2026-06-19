@@ -1,13 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 
 import ErrorFallbackBanner from "@/components/ErrorFallbackBanner";
 import LoadingState from "@/components/LoadingState";
-import type { MapArea } from "@/components/MapView";
+import type { CaseMapMarker, LandPriceMapMarker, MapArea, MapMarkerMode } from "@/components/MapView";
 import { areaKeyFromAddress, areaLabelFromAddress, normalizeAddress } from "@/lib/areaKeys";
 import {
   formatM2,
@@ -56,13 +56,6 @@ interface AreaSourceItem {
   latitude: number;
   longitude: number;
 }
-
-const emptyValuation = calculateValuation({
-  selectedCases: [],
-  landTsubo: 100,
-  growthRatePercent: 0,
-  adjustmentPercent: 0
-});
 
 async function requestJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: "no-store" });
@@ -253,8 +246,6 @@ export default function DashboardPage() {
   const [landPricePoints, setLandPricePoints] = useState<PublicLandPricePoint[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [valuation, setValuation] = useState<ValuationResult>(emptyValuation);
-  const [calculationDirty, setCalculationDirty] = useState(false);
   const [headerScrolled, setHeaderScrolled] = useState(false);
 
   async function loadAllData() {
@@ -274,21 +265,11 @@ export default function DashboardPage() {
       const initialLandPointIds = latestLandPoints(nextLandPricePoints)
         .slice(0, 1)
         .map((point) => point.pointId);
-      const initialGrowthRate = averageGrowthRate(nextLandPricePoints.filter((point) => initialLandPointIds.includes(point.pointId)));
 
       setCases(nextCases);
       setLandPricePoints(nextLandPricePoints);
       setSelectedLandPointIds(initialLandPointIds);
-      setValuation(
-        calculateValuation({
-          selectedCases: nextTransactionCases.filter((item) => item.selected),
-          landTsubo: 100,
-          growthRatePercent: initialGrowthRate,
-          adjustmentPercent: 0
-        })
-      );
       setWarnings(mergeWarnings(csv.warnings, [transactions.warning], [landPrices.warning]));
-      setCalculationDirty(false);
     } catch (error) {
       setWarnings([error instanceof Error ? error.message : "初期データ取得に失敗しました。"]);
     } finally {
@@ -311,48 +292,25 @@ export default function DashboardPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  function markDirty() {
-    setCalculationDirty(true);
-  }
-
   function handleInformationTypeChange(nextInformationType: InformationType) {
-    const nextSelectedCases = isCaseInformationType(nextInformationType)
-      ? cases.filter((item) => caseSourceMatchesInformationType(item, nextInformationType) && item.selected)
-      : [];
-    const nextGrowthRatePercent = averageGrowthRate(
-      landPricePoints.filter((point) => selectedLandPointIds.includes(point.pointId))
-    );
-
     setInformationType(nextInformationType);
     setShowAllProperties(true);
     setSelectedAreaKeys([]);
-    setValuation(
-      calculateValuation({
-        selectedCases: nextSelectedCases,
-        landTsubo,
-        growthRatePercent: nextGrowthRatePercent,
-        adjustmentPercent
-      })
-    );
-    setCalculationDirty(false);
   }
 
   function handleToggleCase(id: string) {
     setCases((current) => current.map((item) => (item.id === id ? { ...item, selected: !item.selected } : item)));
-    markDirty();
   }
 
   function handleToggleLandPoint(pointId: string) {
     setSelectedLandPointIds((current) =>
       current.includes(pointId) ? current.filter((id) => id !== pointId) : [...current, pointId]
     );
-    markDirty();
   }
 
   function handleToggleAllProperties() {
     setShowAllProperties((current) => !current);
     setSelectedAreaKeys([]);
-    markDirty();
   }
 
   function handleToggleMapArea(areaKey: string) {
@@ -364,19 +322,6 @@ export default function DashboardPage() {
     setSelectedAreaKeys((current) =>
       current.includes(areaKey) ? current.filter((key) => key !== areaKey) : [...current, areaKey]
     );
-    markDirty();
-  }
-
-  function handleRecalculate() {
-    setValuation(
-      calculateValuation({
-        selectedCases: selectedVisibleCases,
-        landTsubo,
-        growthRatePercent,
-        adjustmentPercent
-      })
-    );
-    setCalculationDirty(false);
   }
 
   const target = useMemo(() => currentTarget(address), [address]);
@@ -385,9 +330,13 @@ export default function DashboardPage() {
     () => cases.filter((item) => caseSourceMatchesInformationType(item, informationType)),
     [cases, informationType]
   );
-  const areaOptions = useMemo(
-    () => buildAreaOptions(informationType === "公示地価" ? latestPoints : activeCases),
+  const areaSourceItems = useMemo(
+    () => (informationType === "公示地価" ? latestPoints : [...activeCases, ...latestPoints]),
     [activeCases, informationType, latestPoints]
+  );
+  const areaOptions = useMemo(
+    () => buildAreaOptions(areaSourceItems),
+    [areaSourceItems]
   );
   const selectableAreaKeys = useMemo(() => new Set(areaOptions.map((area) => area.key)), [areaOptions]);
   const modeNotice = useMemo(() => informationTypeNotice(informationType), [informationType]);
@@ -403,10 +352,10 @@ export default function DashboardPage() {
   const selectedVisibleCases = useMemo(() => visibleCases.filter((item) => item.selected), [visibleCases]);
   const visibleLatestPoints = useMemo(
     () =>
-      informationType === "公示地価" && !showAllProperties
+      !showAllProperties
         ? latestPoints.filter((point) => selectedAreaKeys.includes(areaKeyFromAddress(point.address)))
         : latestPoints,
-    [informationType, latestPoints, selectedAreaKeys, showAllProperties]
+    [latestPoints, selectedAreaKeys, showAllProperties]
   );
   const visibleSelectedLandPointIds = useMemo(
     () => new Set(visibleLatestPoints.filter((point) => selectedLandPointIds.includes(point.pointId)).map((point) => point.pointId)),
@@ -417,7 +366,7 @@ export default function DashboardPage() {
     [landPricePoints, visibleSelectedLandPointIds]
   );
   const growthRatePercent = useMemo(() => averageGrowthRate(selectedLandSeries), [selectedLandSeries]);
-  const draftValuation = useMemo(
+  const valuation = useMemo(
     () =>
       calculateValuation({
         selectedCases: selectedVisibleCases,
@@ -431,7 +380,40 @@ export default function DashboardPage() {
   const selectedLandPointCount = visibleSelectedLandPointIds.size;
   const allItemsLabel = informationType === "公示地価" ? "全地点表示" : "全物件表示";
   const hideAllItemsLabel = informationType === "公示地価" ? "全地点非表示" : "全物件非表示";
-  const draftUnitPriceLabel = selectedVisibleCases.length > 0 ? formatYenPerTsubo(draftValuation.averageTsuboUnitPrice) : "-";
+  const mapMarkerMode: MapMarkerMode = informationType === "公示地価" ? "land-price" : "cases";
+  const caseMapMarkers = useMemo<CaseMapMarker[]>(
+    () =>
+      visibleCases
+        .filter((comparable) => Number.isFinite(comparable.latitude) && Number.isFinite(comparable.longitude))
+        .map((comparable) => ({
+          id: comparable.id,
+          label: areaLabelFromAddress(comparable.address),
+          subtitle: compactAddress(comparable.address),
+          valueLabel: comparable.priceTotalDisplay || formatYen(comparable.priceTotalYen),
+          detailLabel: formatYenPerTsubo(comparable.unitPricePerTsubo),
+          latitude: comparable.latitude,
+          longitude: comparable.longitude,
+          selected: comparable.selected
+        })),
+    [visibleCases]
+  );
+  const landPriceMapMarkers = useMemo<LandPriceMapMarker[]>(
+    () =>
+      visibleLatestPoints
+        .filter((point) => Number.isFinite(point.latitude) && Number.isFinite(point.longitude))
+        .map((point) => ({
+          pointId: point.pointId,
+          label: point.standardLotNumber || point.pointId,
+          subtitle: [point.nearestStation, point.distanceToStation].filter(Boolean).join(" ") || compactAddress(point.address),
+          valueLabel: formatYenPerM2(point.pricePerM2),
+          detailLabel: formatPercent(point.yearOnYearChangeRate),
+          latitude: point.latitude,
+          longitude: point.longitude,
+          selected: visibleSelectedLandPointIds.has(point.pointId)
+        })),
+    [visibleLatestPoints, visibleSelectedLandPointIds]
+  );
+  const draftUnitPriceLabel = selectedVisibleCases.length > 0 ? formatYenPerTsubo(valuation.averageTsuboUnitPrice) : "-";
   const appraisalAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.appraisalAmount) : "-";
   const bidAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-";
 
@@ -471,7 +453,6 @@ export default function DashboardPage() {
                     value={landTsubo}
                     onChange={(event) => {
                       setLandTsubo(Number(event.target.value) || 0);
-                      markDirty();
                     }}
                   />
                 </label>
@@ -510,9 +491,14 @@ export default function DashboardPage() {
               ) : (
                 <MapView
                   areas={areaOptions}
+                  caseMarkers={caseMapMarkers}
+                  landPriceMarkers={landPriceMapMarkers}
+                  markerMode={mapMarkerMode}
                   selectedAreaKeys={selectedAreaKeys}
                   target={target}
+                  onToggleCase={handleToggleCase}
                   onToggleArea={handleToggleMapArea}
+                  onToggleLandPoint={handleToggleLandPoint}
                 />
               )}
             </div>
@@ -558,8 +544,6 @@ export default function DashboardPage() {
 
         <CalculationFlow
           adjustmentPercent={adjustmentPercent}
-          dirty={calculationDirty}
-          draftValuation={draftValuation}
           growthRatePercent={growthRatePercent}
           landTsubo={landTsubo}
           selectedCaseCount={selectedVisibleCases.length}
@@ -567,9 +551,7 @@ export default function DashboardPage() {
           valuation={valuation}
           onAdjustmentPercentChange={(value) => {
             setAdjustmentPercent(value);
-            markDirty();
           }}
-          onRecalculate={handleRecalculate}
         />
 
         {isCaseInformationType(informationType) ? (
@@ -636,26 +618,20 @@ function VisibilityToggleButton({
 
 function CalculationFlow({
   adjustmentPercent,
-  dirty,
-  draftValuation,
   growthRatePercent,
   landTsubo,
   selectedCaseCount,
   selectedLandPointCount,
   valuation,
-  onAdjustmentPercentChange,
-  onRecalculate
+  onAdjustmentPercentChange
 }: {
   adjustmentPercent: number;
-  dirty: boolean;
-  draftValuation: ValuationResult;
   growthRatePercent: number;
   landTsubo: number;
   selectedCaseCount: number;
   selectedLandPointCount: number;
   valuation: ValuationResult;
   onAdjustmentPercentChange: (value: number) => void;
-  onRecalculate: () => void;
 }) {
   return (
     <section className="calculation-panel">
@@ -666,13 +642,12 @@ function CalculationFlow({
             物件 {selectedCaseCount}件 / 地価 {selectedLandPointCount}地点
           </p>
         </div>
-        {dirty ? <strong className="dirty-label">未再計算</strong> : null}
       </div>
 
       <div className="formula-row">
         <FormulaValue label="用地坪数" value={formatTsubo(landTsubo)} />
         <Operator value="×" />
-        <FormulaValue label="坪単価相場" value={selectedCaseCount > 0 ? formatYenPerTsubo(draftValuation.averageTsuboUnitPrice) : "-"} />
+        <FormulaValue label="坪単価相場" value={selectedCaseCount > 0 ? formatYenPerTsubo(valuation.averageTsuboUnitPrice) : "-"} />
         <Operator value="×" />
         <FormulaValue label="地価上昇率" value={formatMultiplier(growthRatePercent)} />
         <Operator value="=" />
@@ -690,10 +665,6 @@ function CalculationFlow({
         </label>
         <Operator value="=" />
         <FormulaValue label="入札額" value={valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-"} accent />
-        <button className="recalculate-button" type="button" onClick={onRecalculate}>
-          <RefreshCw aria-hidden="true" size={16} />
-          再計算
-        </button>
       </div>
     </section>
   );
