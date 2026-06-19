@@ -483,10 +483,6 @@ export default function DashboardPage() {
     [activeCases, informationType, selectedAreaKeys]
   );
   const selectedVisibleCases = useMemo(() => visibleCases.filter((item) => item.selected), [visibleCases]);
-  const focusedCaseRows = useMemo(
-    () => (selectedAreaKeys.length > 0 ? visibleCases : selectedVisibleCases),
-    [selectedAreaKeys.length, selectedVisibleCases, visibleCases]
-  );
   const visibleLatestPoints = useMemo(
     () =>
       informationType === "公示地価" && selectedAreaKeys.length > 0
@@ -747,9 +743,7 @@ export default function DashboardPage() {
         >
           {isCaseInformationType(informationType) ? (
             <SelectedCaseTable
-              areaFilterActive={hasSelectedAreas}
-              calculationTargetCount={selectedVisibleCases.length}
-              cases={focusedCaseRows}
+              cases={selectedVisibleCases}
               informationType={informationType}
               onSetCaseSelection={handleSetCaseSelection}
               onToggleCase={handleToggleCase}
@@ -1096,15 +1090,11 @@ function SelectAllRowsCheckbox({
 }
 
 function SelectedCaseTable({
-  areaFilterActive,
-  calculationTargetCount,
   cases,
   informationType,
   onSetCaseSelection,
   onToggleCase
 }: {
-  areaFilterActive: boolean;
-  calculationTargetCount: number;
   cases: ComparableCase[];
   informationType: InformationType;
   onSetCaseSelection: (ids: string[], selected: boolean) => void;
@@ -1116,9 +1106,9 @@ function SelectedCaseTable({
   return (
     <section className="selected-case-panel">
       <div className="panel-heading compact selected-case-heading">
-        <h2>{areaFilterActive ? `エリア内の${informationType}` : `計算対象の${informationType}`}</h2>
+        <h2>計算対象の{informationType}</h2>
         <p className="property-count">
-          表示 {cases.length}件 / 計算対象 {calculationTargetCount}件
+          計算対象 {cases.length}件
         </p>
       </div>
       <div className="selected-case-table-wrap">
