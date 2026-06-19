@@ -551,8 +551,7 @@ input[type="number"]::-webkit-outer-spin-button {
   border-radius: var(--radius-lg);
   box-shadow: 0 12px 28px rgba(14, 35, 61, 0.16);
   color: var(--ink);
-  display: grid;
-  gap: 8px;
+  display: block;
   left: 10px;
   max-width: min(324px, calc(100% - 20px));
   padding: 9px 10px;
@@ -570,12 +569,25 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 }
 
-.map-context-heading {
+.map-context-summary {
   align-items: center;
+  cursor: pointer;
   display: grid;
   gap: 8px;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr) 8px;
+  list-style: none;
   min-width: 0;
+  user-select: none;
+}
+
+.map-context-summary::-webkit-details-marker {
+  display: none;
+}
+
+.map-context-summary:focus-visible {
+  border-radius: var(--radius-md);
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
 }
 
 .map-context-pin {
@@ -589,20 +601,20 @@ input[type="number"]::-webkit-outer-spin-button {
   width: 28px;
 }
 
-.map-context-heading div {
+.map-context-summary div {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.map-context-heading span:not(.map-context-pin) {
+.map-context-summary span:not(.map-context-pin, .map-context-toggle-icon) {
   color: var(--muted);
   font-size: 10px;
   font-weight: 900;
   line-height: 1;
 }
 
-.map-context-heading strong {
+.map-context-summary strong {
   color: var(--header-blue);
   display: block;
   font-size: 11px;
@@ -613,12 +625,31 @@ input[type="number"]::-webkit-outer-spin-button {
   white-space: nowrap;
 }
 
+.map-context-toggle-icon {
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--header-blue);
+  border-top: 4px solid transparent;
+  height: 0;
+  justify-self: end;
+  transition: transform var(--transition);
+  width: 0;
+}
+
+.map-context-card[open] .map-context-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.map-context-summary:hover .map-context-toggle-icon,
+.map-context-summary:focus-visible .map-context-toggle-icon {
+  border-left-color: var(--blue);
+}
+
 .map-context-stats {
   border-top: 1px solid var(--grid-line);
   display: grid;
   gap: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0;
+  margin: 8px 0 0;
   padding: 7px 0 0;
 }
 

@@ -332,14 +332,18 @@ function MapContextPanel({
   target: TargetLocation;
   visibleMarkerCount: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div
+    <details
       aria-label="地図表示状況"
       className="map-context-card"
+      open={expanded}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
-      <div className="map-context-heading">
+      <summary className="map-context-summary">
         <span className="map-context-pin" aria-hidden="true">
           <MapPin size={15} strokeWidth={2.7} />
         </span>
@@ -347,7 +351,8 @@ function MapContextPanel({
           <span>査定地</span>
           <strong>{target.address}</strong>
         </div>
-      </div>
+        <span className="map-context-toggle-icon" aria-hidden="true" />
+      </summary>
       <dl className="map-context-stats">
         <div>
           <dt>{primaryMarkerLabel}</dt>
@@ -366,7 +371,7 @@ function MapContextPanel({
           </dd>
         </div>
       </dl>
-    </div>
+    </details>
   );
 }
 
