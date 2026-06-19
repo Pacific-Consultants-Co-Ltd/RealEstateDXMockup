@@ -70,11 +70,11 @@ The Reinfolib routes send `Ocp-Apim-Subscription-Key` from `process.env.REINFOLI
 3. Enter `敷地面積` in tsubo.
 4. Use the `エリア` map.
    - Click a colored administrative area to limit visible rows and pins for the current `情報種別`.
-   - Use `全物件表示` / `全地点表示` to return to all visible data.
+   - Use the `エリア絞込` clear button to remove the area filter and return to all areas.
    - Use the map display menu to show all administrative boundaries or only areas with market data.
 5. Select data for calculation.
    - In case modes, click a map case pin or the table checkbox to include/exclude that comparable case.
-   - In `公示地価` mode, click a public land-price pin or the public land-price table checkbox to include/exclude that point.
+   - Public land-price points are included by default; in `公示地価` mode, click a pin or table checkbox to include/exclude that point.
 6. Review `地価推移` and the public land-price history table. These reflect the selected public land-price points.
 7. Set `補正係数` in the calculation row when the bid should be adjusted above or below the appraisal amount.
 8. Read the result boxes.
