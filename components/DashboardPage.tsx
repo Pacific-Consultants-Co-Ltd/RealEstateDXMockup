@@ -745,7 +745,6 @@ export default function DashboardPage() {
             <SelectedCaseTable
               cases={selectedVisibleCases}
               informationType={informationType}
-              onSetCaseSelection={handleSetCaseSelection}
               onToggleCase={handleToggleCase}
             />
           ) : null}
@@ -1092,17 +1091,12 @@ function SelectAllRowsCheckbox({
 function SelectedCaseTable({
   cases,
   informationType,
-  onSetCaseSelection,
   onToggleCase
 }: {
   cases: ComparableCase[];
   informationType: InformationType;
-  onSetCaseSelection: (ids: string[], selected: boolean) => void;
   onToggleCase: (id: string) => void;
 }) {
-  const selectedCount = cases.filter((comparable) => comparable.selected).length;
-  const allRowsSelected = cases.length > 0 && selectedCount === cases.length;
-
   return (
     <section className="selected-case-panel">
       <div className="panel-heading compact selected-case-heading">
@@ -1115,15 +1109,7 @@ function SelectedCaseTable({
         <table className="selected-case-table">
           <thead>
             <tr>
-              <th>
-                <SelectAllRowsCheckbox
-                  checked={allRowsSelected}
-                  disabled={cases.length === 0}
-                  indeterminate={selectedCount > 0 && selectedCount < cases.length}
-                  label={`表示中の${informationType}をすべて計算対象にする、または外す`}
-                  onToggle={() => onSetCaseSelection(cases.map((comparable) => comparable.id), !allRowsSelected)}
-                />
-              </th>
+              <th aria-label="計算対象"></th>
               <th>町丁目</th>
               <th>所在地</th>
               <th>土地</th>
