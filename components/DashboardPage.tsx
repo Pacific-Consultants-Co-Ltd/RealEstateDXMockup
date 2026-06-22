@@ -745,7 +745,6 @@ export default function DashboardPage() {
             <SelectedCaseTable
               cases={selectedVisibleCases}
               informationType={informationType}
-              onToggleCase={handleToggleCase}
             />
           ) : null}
         </CalculationFlow>
@@ -1090,12 +1089,10 @@ function SelectAllRowsCheckbox({
 
 function SelectedCaseTable({
   cases,
-  informationType,
-  onToggleCase
+  informationType
 }: {
   cases: ComparableCase[];
   informationType: InformationType;
-  onToggleCase: (id: string) => void;
 }) {
   return (
     <section className="selected-case-panel">
@@ -1109,7 +1106,6 @@ function SelectedCaseTable({
         <table className="selected-case-table">
           <thead>
             <tr>
-              <th aria-label="計算対象"></th>
               <th>町丁目</th>
               <th>所在地</th>
               <th>土地</th>
@@ -1121,19 +1117,11 @@ function SelectedCaseTable({
           <tbody>
             {cases.length === 0 ? (
               <tr>
-                <td colSpan={7}>対象なし</td>
+                <td colSpan={6}>対象なし</td>
               </tr>
             ) : null}
             {cases.map((comparable) => (
               <tr className={comparable.selected ? "active-row" : ""} key={comparable.id}>
-                <td>
-                  <input
-                    aria-label={`${comparable.address}を計算対象にする`}
-                    checked={comparable.selected}
-                    type="checkbox"
-                    onChange={() => onToggleCase(comparable.id)}
-                  />
-                </td>
                 <td>{areaLabelFromAddress(comparable.address)}</td>
                 <td>{compactAddress(comparable.address)}</td>
                 <td>

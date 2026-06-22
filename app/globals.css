@@ -1321,8 +1321,6 @@ input[type="number"]::-webkit-outer-spin-button {
 
 .land-table th:first-child,
 .land-table td:first-child,
-.selected-case-table th:first-child,
-.selected-case-table td:first-child,
 .property-table th:first-child,
 .property-table td:first-child {
   text-align: center;
@@ -1523,7 +1521,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .selected-case-table {
-  min-width: 980px;
+  min-width: 934px;
 }
 
 .selected-case-table thead th {
@@ -1533,16 +1531,11 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .selected-case-table td:nth-child(1) {
-  text-align: center;
-  width: 46px;
-}
-
-.selected-case-table td:nth-child(2) {
   font-weight: 900;
   width: 126px;
 }
 
-.selected-case-table td:nth-child(3) {
+.selected-case-table td:nth-child(2) {
   min-width: 220px;
 }
 
