@@ -348,14 +348,24 @@ input[type="number"]::-webkit-outer-spin-button {
 .metric-box.strong strong {
   color: var(--accent);
   font-size: 14px;
+  font-weight: 900;
 }
 
 .metric-box.strong {
+  background: var(--accent-soft);
   border-color: rgba(var(--accent-rgb), 0.55);
+  box-shadow: 0 3px 10px rgba(var(--accent-rgb), 0.15);
 }
 
 .metric-box.strong::before {
   background: var(--accent);
+}
+
+.metric-box.strong span {
+  background: var(--accent);
+  border-bottom-color: var(--accent);
+  color: #ffffff;
+  font-weight: 900;
 }
 
 .area-filter-status {
@@ -1403,6 +1413,21 @@ input[type="number"]::-webkit-outer-spin-button {
 .formula-cell.strong strong,
 .formula-cell.accent strong {
   color: var(--accent);
+}
+
+.formula-cell.accent {
+  background: var(--accent-soft);
+  border-color: rgba(var(--accent-rgb), 0.45);
+}
+
+.formula-cell.accent span {
+  background: #c8e4e7;
+  border-bottom-color: rgba(var(--accent-rgb), 0.24);
+  color: var(--accent);
+}
+
+.formula-cell.accent strong {
+  font-size: 13px;
 }
 
 .formula-cell.input-cell input {

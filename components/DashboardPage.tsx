@@ -614,7 +614,7 @@ export default function DashboardPage() {
                 <MetricBox label="単価相場" value={draftUnitPriceLabel} />
                 <MetricBox label="上昇率" value={formatPercent(growthRatePercent)} />
                 <MetricBox label="査定金額" value={appraisalAmountLabel} />
-                <MetricBox label="入札額" value={bidAmountLabel} strong />
+                <MetricBox label="最終入札額" value={bidAmountLabel} strong />
               </div>
             </div>
           </div>
