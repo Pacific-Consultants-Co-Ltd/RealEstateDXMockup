@@ -626,7 +626,7 @@ export default function DashboardPage() {
         <section className="evidence-grid" aria-label="周辺資料">
           <div className="report-map">
             <div className="section-toolbar">
-              <SectionLabel label="エリア" />
+              <SectionLabel label="周辺エリア" />
               <AreaFilterStatus active={hasSelectedAreas} label={selectedAreaSummary} onClear={handleClearAreaFilter} />
               <TargetPlacementButton
                 active={targetPlacementActive}
@@ -752,19 +752,17 @@ function MetricBox({ label, value, strong = false }: { label: string; value: str
 }
 
 function AreaFilterStatus({ active, label, onClear }: { active: boolean; label: string; onClear: () => void }) {
-  if (!active) {
-    return null;
-  }
-
   return (
-    <div aria-label={`エリア絞込: ${label}`} className="area-filter-status">
-      <span className="area-filter-label">エリア絞込</span>
+    <div aria-label={`表示範囲: ${label}`} className={`area-filter-status${active ? " is-active" : ""}`}>
+      <span className="area-filter-label">{active ? "絞込中" : "表示範囲"}</span>
       <span className="area-filter-value" title={label}>
         {label}
       </span>
-      <button aria-label="エリア絞込を解除" className="area-filter-clear-button" title="エリア絞込を解除" type="button" onClick={onClear}>
-        <SquareX aria-hidden="true" size={13} strokeWidth={2.5} />
-      </button>
+      {active ? (
+        <button aria-label="エリア絞込を解除" className="area-filter-clear-button" title="エリア絞込を解除" type="button" onClick={onClear}>
+          <SquareX aria-hidden="true" size={13} strokeWidth={2.5} />
+        </button>
+      ) : null}
     </div>
   );
 }
