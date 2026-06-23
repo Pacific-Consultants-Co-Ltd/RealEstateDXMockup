@@ -69,9 +69,7 @@ interface MapViewProps {
   target: TargetLocation;
   targetPlacementActive: boolean;
   onPickTarget: (location: TargetPickLocation) => void;
-  onToggleCase: (id: string) => void;
   onToggleArea: (areaKey: string) => void;
-  onToggleLandPoint: (pointId: string) => void;
 }
 
 type BoundaryProperties = {
@@ -561,7 +559,7 @@ function MarkerTooltip({
         {valueLabel}
         {detailLabel ? ` / ${detailLabel}` : ""}
       </em>
-      <small>{selected ? "選択中" : "クリックで選択"}</small>
+      <small>{selected ? "計算対象" : "一覧で選択"}</small>
     </Tooltip>
   );
 }
@@ -698,9 +696,7 @@ export default function MapView({
   target,
   targetPlacementActive,
   onPickTarget,
-  onToggleArea,
-  onToggleCase,
-  onToggleLandPoint
+  onToggleArea
 }: MapViewProps) {
   const [boundaryData, setBoundaryData] = useState<BoundaryFeatureCollection | null>(null);
   const [boundaryError, setBoundaryError] = useState(false);
@@ -953,10 +949,7 @@ export default function MapView({
                           latitude: event.latlng.lat,
                           longitude: event.latlng.lng
                         });
-                        return;
                       }
-
-                      onToggleCase(marker.id);
                     },
                     mousemove: closeBoundaryTooltips,
                     mouseover: closeBoundaryTooltips
@@ -989,10 +982,7 @@ export default function MapView({
                           latitude: event.latlng.lat,
                           longitude: event.latlng.lng
                         });
-                        return;
                       }
-
-                      onToggleLandPoint(marker.pointId);
                     },
                     mousemove: closeBoundaryTooltips,
                     mouseover: closeBoundaryTooltips

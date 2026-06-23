@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { MapPin, MapPinOff, SquareCheck, SquareX } from "lucide-react";
+import { MapPin, MapPinOff, SquareX } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
@@ -512,9 +512,6 @@ export default function DashboardPage() {
   const historyRows = useMemo(() => buildHistoryRows(selectedLandSeries), [selectedLandSeries]);
   const selectedLandPointCount = visibleSelectedLandPointIds.size;
   const mapMarkerMode: MapMarkerMode = informationType === "公示地価" ? "land-price" : "cases";
-  const selectionItemLabel = informationType === "公示地価" ? "地点" : "事例";
-  const activeSelectableCount = isCaseInformationType(informationType) ? visibleCases.length : visibleLatestPoints.length;
-  const activeSelectedCount = isCaseInformationType(informationType) ? selectedVisibleCases.length : selectedLandPointCount;
   const hasSelectedAreas = selectedAreaKeys.length > 0;
   const selectedAreaSummary = useMemo(() => {
     const labelByKey = new Map(areaOptions.map((area) => [area.key, area.label]));
@@ -567,29 +564,6 @@ export default function DashboardPage() {
   const draftUnitPriceLabel = selectedVisibleCases.length > 0 ? formatYenPerTsubo(valuation.averageTsuboUnitPrice) : "-";
   const appraisalAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.appraisalAmount) : "-";
   const bidAmountLabel = valuation.selectedCount > 0 ? formatYen(valuation.bidAmount) : "-";
-
-  function handleSelectAllVisibleItems() {
-    if (isCaseInformationType(informationType)) {
-      const visibleIds = new Set(visibleCases.map((item) => item.id));
-      setCases((current) => current.map((item) => (visibleIds.has(item.id) ? { ...item, selected: true } : item)));
-      return;
-    }
-
-    setSelectedLandPointIds((current) =>
-      Array.from(new Set([...current, ...visibleLatestPoints.map((point) => point.pointId)]))
-    );
-  }
-
-  function handleClearVisibleSelection() {
-    if (isCaseInformationType(informationType)) {
-      const visibleIds = new Set(visibleCases.map((item) => item.id));
-      setCases((current) => current.map((item) => (visibleIds.has(item.id) ? { ...item, selected: false } : item)));
-      return;
-    }
-
-    const visiblePointIds = new Set(visibleLatestPoints.map((point) => point.pointId));
-    setSelectedLandPointIds((current) => current.filter((pointId) => !visiblePointIds.has(pointId)));
-  }
 
   return (
     <main className="report-app">
@@ -660,13 +634,6 @@ export default function DashboardPage() {
                 onToggle={handleTargetPlacementToggle}
               />
               {targetOverride ? <TargetPinClearButton onClear={handleClearTargetPin} /> : null}
-              <SelectionActionButtons
-                itemLabel={selectionItemLabel}
-                selectedCount={activeSelectedCount}
-                totalCount={activeSelectableCount}
-                onClearSelection={handleClearVisibleSelection}
-                onSelectAll={handleSelectAllVisibleItems}
-              />
             </div>
             <div className="report-map-body">
               {loading && cases.length === 0 ? (
@@ -680,9 +647,7 @@ export default function DashboardPage() {
                   selectedAreaKeys={selectedAreaKeys}
                   target={target}
                   targetPlacementActive={targetPlacementActive}
-                  onToggleCase={handleToggleCase}
                   onToggleArea={handleToggleMapArea}
-                  onToggleLandPoint={handleToggleLandPoint}
                   onPickTarget={handlePickTarget}
                 />
               )}
@@ -838,52 +803,6 @@ function TargetPinClearButton({ onClear }: { onClear: () => void }) {
     <button aria-label={label} className="target-clear-button" title={label} type="button" onClick={onClear}>
       <MapPinOff aria-hidden="true" size={14} strokeWidth={2.5} />
     </button>
-  );
-}
-
-function SelectionActionButtons({
-  itemLabel,
-  selectedCount,
-  totalCount,
-  onClearSelection,
-  onSelectAll
-}: {
-  itemLabel: string;
-  selectedCount: number;
-  totalCount: number;
-  onClearSelection: () => void;
-  onSelectAll: () => void;
-}) {
-  const targetItemLabel = `対象${itemLabel}`;
-  const selectAllLabel = `表示中の${itemLabel}をすべて計算対象にする`;
-  const clearSelectionLabel = `表示中の${targetItemLabel}をすべて外す`;
-
-  return (
-    <div className="selection-actions" aria-label="計算対象操作">
-      <span className="selection-count">
-        {targetItemLabel} {selectedCount.toLocaleString("ja-JP")}/{totalCount.toLocaleString("ja-JP")}
-      </span>
-      <button
-        aria-label={selectAllLabel}
-        className="selection-action-button"
-        disabled={totalCount === 0 || selectedCount === totalCount}
-        title={selectAllLabel}
-        type="button"
-        onClick={onSelectAll}
-      >
-        <SquareCheck aria-hidden="true" size={14} strokeWidth={2.5} />
-      </button>
-      <button
-        aria-label={clearSelectionLabel}
-        className="selection-action-button"
-        disabled={selectedCount === 0}
-        title={clearSelectionLabel}
-        type="button"
-        onClick={onClearSelection}
-      >
-        <SquareX aria-hidden="true" size={14} strokeWidth={2.5} />
-      </button>
-    </div>
   );
 }
 
