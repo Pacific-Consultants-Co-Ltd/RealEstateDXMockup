@@ -1501,7 +1501,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .selected-case-table-wrap {
-  max-height: 128px;
+  max-height: clamp(160px, 22vh, 220px);
   scrollbar-gutter: stable;
 }
 
